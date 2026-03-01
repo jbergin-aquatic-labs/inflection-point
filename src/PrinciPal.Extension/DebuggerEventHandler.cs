@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using EnvDTE;
 using EnvDTE80;
 using Microsoft.VisualStudio.Shell;
-using PrinciPal.Contracts;
+using PrinciPal.Domain.ValueObjects;
 using Task = System.Threading.Tasks.Task;
 
 namespace PrinciPal.Extension

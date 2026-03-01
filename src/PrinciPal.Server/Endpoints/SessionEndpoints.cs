@@ -1,4 +1,4 @@
-using PrinciPal.Server.Services;
+using PrinciPal.Application.Interfaces;
 
 namespace PrinciPal.Server.Endpoints;
 
@@ -8,9 +8,9 @@ internal static class SessionEndpoints
     {
         var group = app.MapGroup("/api/sessions");
 
-        group.MapGet("/", (SessionManager mgr) => Results.Ok(mgr.GetAllSessions()));
+        group.MapGet("/", (ISessionManager mgr) => Results.Ok(mgr.GetAllSessions()));
 
-        group.MapDelete("/{sessionId}", (SessionManager mgr, string sessionId) =>
+        group.MapDelete("/{sessionId}", (ISessionManager mgr, string sessionId) =>
         {
             mgr.RemoveSession(sessionId);
             return Results.Ok();

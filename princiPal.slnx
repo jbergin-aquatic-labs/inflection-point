@@ -1,11 +1,17 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/PrinciPal.Contracts/PrinciPal.Contracts.csproj" />
+    <Project Path="src/PrinciPal.Domain/PrinciPal.Domain.csproj" />
+    <Project Path="src/PrinciPal.Application/PrinciPal.Application.csproj" />
     <Project Path="src/PrinciPal.Server/PrinciPal.Server.csproj" />
     <Project Path="src/PrinciPal.Extension/PrinciPal.Extension.csproj" />
   </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/PrinciPal.Server.Tests/PrinciPal.Server.Tests.csproj" />
+  <Folder Name="/tests/unit/">
+    <Project Path="tests/unit/PrinciPal.Domain.Tests/PrinciPal.Domain.Tests.csproj" />
+    <Project Path="tests/unit/PrinciPal.Application.Tests/PrinciPal.Application.Tests.csproj" />
+    <Project Path="tests/unit/PrinciPal.Server.Tests/PrinciPal.Server.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/integration/">
+    <Project Path="tests/integration/PrinciPal.Integration.Tests/PrinciPal.Integration.Tests.csproj" />
   </Folder>
   <Folder Name="/.claude/">
     <File Path="CLAUDE.md" />

@@ -1,5 +1,5 @@
+using PrinciPal.Application.Interfaces;
 using PrinciPal.Server.Endpoints;
-using PrinciPal.Server.Services;
 
 namespace PrinciPal.Server.Extensions;
 
@@ -7,7 +7,7 @@ internal static class WebApplicationExtensions
 {
     public static WebApplication UseIdleShutdownWatchdog(this WebApplication app)
     {
-        var sessionManager = app.Services.GetRequiredService<SessionManager>();
+        var sessionManager = app.Services.GetRequiredService<ISessionManager>();
         var thread = new Thread(() =>
         {
             // Wait for at least one session to connect

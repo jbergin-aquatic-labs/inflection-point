@@ -1,5 +1,7 @@
 using System.Reflection;
-using PrinciPal.Server.Services;
+using PrinciPal.Application.Interfaces;
+using PrinciPal.Application.Services;
+using PrinciPal.Server.Infrastructure;
 
 namespace PrinciPal.Server.Extensions;
 
@@ -10,7 +12,9 @@ internal static class ServiceCollectionExtensions
         var version = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
 
-        services.AddSingleton<SessionManager>();
+        services.AddSingleton<ISessionManager, SessionManager>();
+        services.AddSingleton<ISourceFileReader, SourceFileReader>();
+        services.AddSingleton<IDebugQueryService, DebugQueryService>();
 
         services.AddMcpServer(options =>
         {

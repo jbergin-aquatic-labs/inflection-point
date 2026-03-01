@@ -1,44 +1,28 @@
 using System.ComponentModel;
-using System.Text;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
-using PrinciPal.Contracts;
-using PrinciPal.Server.Services;
+using PrinciPal.Application.Interfaces;
 
 namespace PrinciPal.Server.Tools;
 
 /// <summary>
-/// MCP tools that expose the cached Visual Studio debug state to AI clients
-/// (Claude Code, Cursor, etc.). Each tool reads from a session-scoped
-/// <see cref="DebugStateStore"/> which is populated by the VSIX extension via REST.
+/// Thin MCP wrapper that delegates all orchestration to <see cref="IDebugQueryService"/>.
+/// Each method catches standard exceptions and wraps them as <see cref="McpException"/>.
 /// </summary>
 [McpServerToolType]
 public class DebugTools
 {
-    private readonly SessionManager _sessionManager;
+    private readonly IDebugQueryService _queryService;
 
-    public DebugTools(SessionManager sessionManager)
+    public DebugTools(IDebugQueryService queryService)
     {
-        _sessionManager = sessionManager;
+        _queryService = queryService;
     }
 
     [McpServerTool(Name = "list_sessions", ReadOnly = true)]
     [Description("List all connected Visual Studio debug sessions. Shows session names, IDs, solution paths, and whether each session is currently debugging. Use the name or ID as the 'session' parameter in other tools.")]
     public string ListSessions()
-    {
-        var sessions = _sessionManager.GetAllSessions();
-        if (sessions.Count == 0)
-            return "No Visual Studio sessions connected.";
-
-        var sb = new StringBuilder();
-        sb.AppendLine($"{sessions.Count} session(s):");
-        foreach (var s in sessions)
-        {
-            var status = s.HasDebugState ? "debugging" : "idle";
-            sb.AppendLine($"  {s.Name} [{s.SessionId}] ({status}) - {s.SolutionPath}");
-        }
-        return sb.ToString();
-    }
+        => Wrap(() => _queryService.ListSessions());
 
     [McpServerTool(Name = "get_debug_state", ReadOnly = true)]
     [Description("Get the full current debug state from Visual Studio including locals, call stack, and current source location. Use this to understand what is happening at a breakpoint.")]
@@ -47,37 +31,7 @@ public class DebugTools
         string session,
         [Description("Max member expansion depth (0=flat, 2=default)")]
         int depth = 2)
-    {
-        var store = ResolveStore(session);
-        var state = store.GetCurrentState();
-        if (state is null)
-            throw new McpException("No debug state available. Make sure Visual Studio is stopped at a breakpoint and the PrinciPal extension is running.");
-
-        if (!state.IsInBreakMode)
-            throw new McpException("Visual Studio is not in break mode. Hit a breakpoint first.");
-
-        var sb = new StringBuilder();
-
-        if (state.CurrentLocation is not null)
-        {
-            sb.AppendLine("[loc]");
-            sb.AppendLine(CompactFormatter.FormatLocation(state.CurrentLocation));
-        }
-
-        if (state.Locals.Count > 0)
-        {
-            sb.AppendLine("[locals]");
-            CompactFormatter.FormatVariables(sb, state.Locals, 0, depth);
-        }
-
-        if (state.CallStack.Count > 0)
-        {
-            sb.AppendLine("[stack]");
-            CompactFormatter.FormatCallStack(sb, state.CallStack);
-        }
-
-        return sb.ToString();
-    }
+        => Wrap(() => _queryService.GetDebugState(session, depth));
 
     [McpServerTool(Name = "get_locals", ReadOnly = true)]
     [Description("Get all local variables and their values at the current breakpoint in Visual Studio. Returns variable names, types, values, and nested members.")]
@@ -86,81 +40,28 @@ public class DebugTools
         string session,
         [Description("Max member expansion depth (0=flat, 2=default)")]
         int depth = 2)
-    {
-        var store = ResolveStore(session);
-        var state = GetBreakModeState(store);
-
-        if (state.Locals.Count == 0)
-            return "No local variables in the current scope.";
-
-        var sb = new StringBuilder();
-        sb.AppendLine("[locals]");
-        CompactFormatter.FormatVariables(sb, state.Locals, 0, depth);
-        return sb.ToString();
-    }
+        => Wrap(() => _queryService.GetLocals(session, depth));
 
     [McpServerTool(Name = "get_call_stack", ReadOnly = true)]
     [Description("Get the current call stack from Visual Studio debugger. Shows the chain of method calls that led to the current breakpoint.")]
     public string GetCallStack(
         [Description("Session name or ID. Use list_sessions to see options.")]
         string session)
-    {
-        var store = ResolveStore(session);
-        var state = GetBreakModeState(store);
-
-        if (state.CallStack.Count == 0)
-            return "Call stack is empty.";
-
-        var sb = new StringBuilder();
-        sb.AppendLine("[stack]");
-        CompactFormatter.FormatCallStack(sb, state.CallStack);
-        return sb.ToString();
-    }
+        => Wrap(() => _queryService.GetCallStack(session));
 
     [McpServerTool(Name = "get_source_context", ReadOnly = true)]
     [Description("Get the source code surrounding the current breakpoint location in Visual Studio. Shows approximately 30 lines with the current line highlighted.")]
     public string GetSourceContext(
         [Description("Session name or ID. Use list_sessions to see options.")]
         string session)
-    {
-        var store = ResolveStore(session);
-        var state = GetBreakModeState(store);
-
-        if (state.CurrentLocation is null)
-            throw new McpException("No source location information available.");
-
-        return FormatSourceContext(state);
-    }
+        => Wrap(() => _queryService.GetSourceContext(session));
 
     [McpServerTool(Name = "get_breakpoints", ReadOnly = true)]
     [Description("List all breakpoints currently set in Visual Studio, including their file locations, conditions, and enabled status.")]
     public string GetBreakpoints(
         [Description("Session name or ID. Use list_sessions to see options.")]
         string session)
-    {
-        var store = ResolveStore(session);
-        var state = store.GetCurrentState();
-        if (state is null)
-            throw new McpException("No debug state available.");
-
-        if (state.Breakpoints.Count == 0)
-            return "No breakpoints are set.";
-
-        var sb = new StringBuilder();
-        sb.AppendLine("[breakpoints]");
-        foreach (var bp in state.Breakpoints)
-        {
-            var status = bp.Enabled ? "on" : "off";
-            sb.Append($"{Path.GetFileName(bp.FilePath)}:{bp.Line} ({status})");
-            if (!string.IsNullOrEmpty(bp.FunctionName))
-                sb.Append($" {bp.FunctionName}");
-            if (!string.IsNullOrEmpty(bp.Condition))
-                sb.Append($" when {bp.Condition}");
-            sb.AppendLine();
-        }
-
-        return sb.ToString();
-    }
+        => Wrap(() => _queryService.GetBreakpoints(session));
 
     [McpServerTool(Name = "get_expression_result", ReadOnly = true)]
     [Description("Get the result of the last expression evaluated in the Visual Studio debugger. The VSIX extension pushes expression results after evaluation.")]
@@ -169,122 +70,21 @@ public class DebugTools
         string session,
         [Description("Max member expansion depth (0=flat, 2=default)")]
         int depth = 2)
-    {
-        var store = ResolveStore(session);
-        var result = store.GetLastExpression();
-        if (result is null)
-            throw new McpException("No expression result available. Evaluate an expression in Visual Studio first.");
-
-        var sb = new StringBuilder();
-        var valid = result.IsValid ? "" : " [!]";
-        sb.AppendLine($"expr {result.Expression}:{result.Type}={result.Value}{valid}");
-
-        if (result.Members.Count > 0)
-        {
-            CompactFormatter.FormatVariables(sb, result.Members, 1, depth);
-        }
-
-        return sb.ToString();
-    }
+        => Wrap(() => _queryService.GetExpressionResult(session, depth));
 
     [McpServerTool(Name = "explain_current_state", ReadOnly = true)]
     [Description("Get a combined view of source code context, local variables, and call stack at the current breakpoint. Ideal for asking the AI to explain what is happening.")]
     public string ExplainCurrentState(
         [Description("Session name or ID. Use list_sessions to see options.")]
         string session)
-    {
-        var store = ResolveStore(session);
-        var sb = new StringBuilder();
-
-        try
-        {
-            var state = GetBreakModeState(store);
-            if (state.CurrentLocation is not null)
-                sb.AppendLine(FormatSourceContext(state));
-        }
-        catch { /* source may not be available */ }
-
-        sb.AppendLine();
-
-        try
-        {
-            var state = GetBreakModeState(store);
-            if (state.Locals.Count == 0)
-            {
-                sb.AppendLine("No local variables in the current scope.");
-            }
-            else
-            {
-                var localsSb = new StringBuilder();
-                localsSb.AppendLine("[locals]");
-                CompactFormatter.FormatVariables(localsSb, state.Locals, 0, 2);
-                sb.AppendLine(localsSb.ToString());
-            }
-        }
-        catch { /* locals may not be available */ }
-
-        sb.AppendLine();
-
-        try
-        {
-            var state = GetBreakModeState(store);
-            if (state.CallStack.Count == 0)
-            {
-                sb.AppendLine("Call stack is empty.");
-            }
-            else
-            {
-                var stackSb = new StringBuilder();
-                stackSb.AppendLine("[stack]");
-                CompactFormatter.FormatCallStack(stackSb, state.CallStack);
-                sb.AppendLine(stackSb.ToString());
-            }
-        }
-        catch { /* call stack may not be available */ }
-
-        var text = sb.ToString().Trim();
-        if (string.IsNullOrEmpty(text))
-            throw new McpException("No debug state available.");
-
-        return text;
-    }
-
-    // ------------------------------------------------------------------
-    // History tools
-    // ------------------------------------------------------------------
+        => Wrap(() => _queryService.ExplainCurrentState(session));
 
     [McpServerTool(Name = "get_breakpoint_history", ReadOnly = true)]
     [Description("Get a summary list of all breakpoint snapshots captured during this debug session. Each entry shows the snapshot index, timestamp, source location, and local variable count. Use get_snapshot to drill into a specific snapshot.")]
     public string GetBreakpointHistory(
         [Description("Session name or ID. Use list_sessions to see options.")]
         string session)
-    {
-        var store = ResolveStore(session);
-        var history = store.GetHistory();
-        if (history.Count == 0)
-            throw new McpException("No breakpoint history available. Hit some breakpoints first — each break-mode stop is recorded automatically.");
-
-        var sb = new StringBuilder();
-        var totalCaptured = store.TotalCaptured;
-        if (totalCaptured > history.Count)
-            sb.AppendLine($"History ({history.Count} of {totalCaptured} captured, showing #{history[0].Index}..#{history[^1].Index})");
-        else
-            sb.AppendLine($"History ({history.Count} snapshots)");
-
-        foreach (var snapshot in history)
-        {
-            var loc = snapshot.State.CurrentLocation;
-            var file = loc != null ? Path.GetFileName(loc.FilePath) : "unknown";
-            var line = loc?.Line ?? 0;
-            var func = loc?.FunctionName ?? "unknown";
-            var localCount = snapshot.State.Locals.Count;
-            var time = snapshot.CapturedAt.ToString("HH:mm:ss.fff");
-
-            sb.AppendLine($"#{snapshot.Index} [{time}] {func} ({file}:{line}) {localCount} locals");
-        }
-
-        return sb.ToString();
-    }
+        => Wrap(() => _queryService.GetBreakpointHistory(session));
 
     [McpServerTool(Name = "get_snapshot", ReadOnly = true)]
     [Description("Get the full debug state for a specific breakpoint snapshot by its index number. Returns locals, call stack, and source location captured at that breakpoint hit. Use get_breakpoint_history first to see available snapshot indices.")]
@@ -297,47 +97,7 @@ public class DebugTools
         string detail = "full",
         [Description("Max member expansion depth (0=flat, 2=default)")]
         int depth = 2)
-    {
-        var store = ResolveStore(session);
-        var snapshot = store.GetSnapshot(index);
-        if (snapshot is null)
-        {
-            if (index >= 0 && index < store.TotalCaptured)
-            {
-                var history = store.GetHistory();
-                var oldest = history.Count > 0 ? history[0].Index : store.TotalCaptured;
-                throw new McpException($"Snapshot #{index} was evicted (history keeps last {store.MaxHistorySize}). Oldest available: #{oldest}.");
-            }
-            throw new McpException($"Snapshot #{index} not found. Use get_breakpoint_history to see available snapshots.");
-        }
-
-        var state = snapshot.State;
-        var sb = new StringBuilder();
-        var time = snapshot.CapturedAt.ToString("HH:mm:ss.fff");
-
-        if (state.CurrentLocation is not null)
-        {
-            sb.AppendLine($"#{snapshot.Index} [{time}] {CompactFormatter.FormatLocation(state.CurrentLocation)}");
-        }
-        else
-        {
-            sb.AppendLine($"#{snapshot.Index} [{time}]");
-        }
-
-        if (state.Locals.Count > 0)
-        {
-            sb.AppendLine("[locals]");
-            CompactFormatter.FormatVariables(sb, state.Locals, 0, depth);
-        }
-
-        if (state.CallStack.Count > 0)
-        {
-            sb.AppendLine("[stack]");
-            CompactFormatter.FormatCallStack(sb, state.CallStack);
-        }
-
-        return sb.ToString();
-    }
+        => Wrap(() => _queryService.GetSnapshot(index, session, detail, depth));
 
     [McpServerTool(Name = "explain_execution_flow", ReadOnly = true)]
     [Description("Get all captured breakpoint snapshots formatted as an execution trace. Ideal for asking the AI to analyze how values change across multiple breakpoints and explain the overall program flow.")]
@@ -352,146 +112,21 @@ public class DebugTools
         int start = 0,
         [Description("Number of snapshots to show (0=all, default 0)")]
         int count = 0)
+        => Wrap(() => _queryService.ExplainExecutionFlow(session, detail, depth, start, count));
+
+    private static string Wrap(Func<string> action)
     {
-        var store = ResolveStore(session);
-        var history = store.GetHistory();
-        if (history.Count == 0)
-            throw new McpException("No breakpoint history available. Hit some breakpoints first — each break-mode stop is recorded automatically.");
-
-        var filtered = history.Where(s => s.Index >= start).ToList();
-        if (count > 0)
-            filtered = filtered.Take(count).ToList();
-
-        var sb = new StringBuilder();
-
-        // Header
-        var totalCaptured = store.TotalCaptured;
-        var hasEviction = totalCaptured > history.Count;
-        var hasPagination = count > 0 || start > 0;
-        if (hasEviction || hasPagination)
+        try
         {
-            var actualStart = filtered.Count > 0 ? filtered[0].Index : start;
-            var totalLabel = hasEviction ? $"{history.Count} of {totalCaptured} captured" : $"{history.Count} total";
-            sb.AppendLine($"Trace ({totalLabel}, showing {filtered.Count} from #{actualStart})");
+            return action();
         }
-        else
-            sb.AppendLine($"Trace ({filtered.Count} snapshots)");
-
-        DebugStateSnapshot? prevSnapshot = null;
-
-        foreach (var snapshot in filtered)
+        catch (McpException)
         {
-            var state = snapshot.State;
-            var loc = state.CurrentLocation;
-            var file = loc != null ? Path.GetFileName(loc.FilePath) : "unknown";
-            var func = loc?.FunctionName ?? "unknown";
-            var line = loc?.Line ?? 0;
-            var time = snapshot.CapturedAt.ToString("HH:mm:ss.fff");
-
-            sb.AppendLine($"#{snapshot.Index} [{time}] {func} ({file}:{line})");
-
-            switch (detail)
-            {
-                case "summary":
-                    if (prevSnapshot != null)
-                    {
-                        var summary = CompactFormatter.FormatVariableChangeSummary(
-                            prevSnapshot.State.Locals, state.Locals);
-                        sb.AppendLine(summary);
-                    }
-                    break;
-
-                case "full":
-                    if (state.Locals.Count > 0)
-                    {
-                        sb.AppendLine("[locals]");
-                        CompactFormatter.FormatVariables(sb, state.Locals, 0, depth);
-                    }
-                    if (state.CallStack.Count > 0)
-                    {
-                        sb.AppendLine("[stack]");
-                        CompactFormatter.FormatCallStack(sb, state.CallStack);
-                    }
-                    break;
-
-                case "changes":
-                default:
-                    if (prevSnapshot == null)
-                    {
-                        // First snapshot: show full state
-                        if (state.Locals.Count > 0)
-                        {
-                            sb.AppendLine("[locals]");
-                            CompactFormatter.FormatVariables(sb, state.Locals, 0, depth);
-                        }
-                        if (state.CallStack.Count > 0)
-                        {
-                            sb.AppendLine("[stack]");
-                            CompactFormatter.FormatCallStack(sb, state.CallStack);
-                        }
-                    }
-                    else
-                    {
-                        // Subsequent: show diff
-                        CompactFormatter.FormatVariableDiff(sb,
-                            prevSnapshot.State.Locals, state.Locals, depth);
-                        CompactFormatter.FormatCallStackDiff(sb,
-                            prevSnapshot.State.CallStack, state.CallStack);
-                    }
-                    break;
-            }
-
-            sb.AppendLine();
-            prevSnapshot = snapshot;
+            throw; // Already an MCP exception, rethrow as-is
         }
-
-        return sb.ToString();
-    }
-
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
-
-    private DebugStateStore ResolveStore(string session)
-    {
-        var (store, error) = _sessionManager.ResolveByNameOrId(session);
-        if (store is not null)
-            return store;
-        throw new McpException(error!);
-    }
-
-    private static DebugState GetBreakModeState(DebugStateStore store)
-    {
-        var state = store.GetCurrentState();
-        if (state is null || !state.IsInBreakMode)
-            throw new McpException("No debug state available or not in break mode.");
-        return state;
-    }
-
-    private static string FormatSourceContext(DebugState state)
-    {
-        var filePath = state.CurrentLocation!.FilePath;
-        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
-            return $"Source file not accessible: {filePath}";
-
-        var lines = File.ReadAllLines(filePath);
-        var currentLine = state.CurrentLocation.Line;
-        var startLine = Math.Max(1, currentLine - 15);
-        var endLine = Math.Min(lines.Length, currentLine + 15);
-
-        var sb = new StringBuilder();
-        sb.AppendLine($"## Source: {Path.GetFileName(filePath)}");
-        sb.AppendLine($"**Function**: `{state.CurrentLocation.FunctionName}`");
-        sb.AppendLine($"**Line {currentLine}** (showing {startLine}-{endLine})");
-        sb.AppendLine();
-        sb.AppendLine("```csharp");
-        for (int i = startLine; i <= endLine; i++)
+        catch (Exception ex)
         {
-            var prefix = i == currentLine ? ">>> " : "    ";
-            sb.AppendLine($"{prefix}{i,4}: {lines[i - 1]}");
+            throw new McpException(ex.Message);
         }
-        sb.AppendLine("```");
-
-        return sb.ToString();
     }
 }
