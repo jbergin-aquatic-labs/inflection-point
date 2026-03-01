@@ -4,7 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using PrinciPal.Contracts;
 
-namespace PrinciPal.McpServer.Tests;
+namespace PrinciPal.Server.Tests;
 
 public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 {

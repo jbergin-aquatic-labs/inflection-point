@@ -6,7 +6,7 @@ using System.Reflection;
 
 namespace PrinciPal.Extension
 {
-    public sealed class McpServerProcessManager : IDisposable
+    public sealed class ServerProcessManager : IDisposable
     {
         private readonly Action<string> _log;
         private readonly object _lock = new object();
@@ -16,7 +16,7 @@ namespace PrinciPal.Extension
         private bool _disposed;
 
         private const int MaxRestarts = 5;
-        private const string ServerExeRelativePath = "Server\\PrinciPal.McpServer.exe";
+        private const string ServerExeRelativePath = "Server\\PrinciPal.Server.exe";
         private const string DevMarkerRelativePath = "Server\\.devproject";
 
         public int Port
@@ -24,7 +24,7 @@ namespace PrinciPal.Extension
             get { lock (_lock) { return _port; } }
         }
 
-        public McpServerProcessManager(Action<string> log)
+        public ServerProcessManager(Action<string> log)
         {
             _log = log ?? throw new ArgumentNullException(nameof(log));
         }

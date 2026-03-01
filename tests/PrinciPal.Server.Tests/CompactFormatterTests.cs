@@ -1,8 +1,8 @@
 using System.Text;
 using PrinciPal.Contracts;
-using PrinciPal.McpServer.Tools;
+using PrinciPal.Server.Tools;
 
-namespace PrinciPal.McpServer.Tests;
+namespace PrinciPal.Server.Tests;
 
 public class CompactFormatterTests
 {

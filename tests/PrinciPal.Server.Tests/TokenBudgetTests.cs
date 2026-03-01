@@ -1,8 +1,8 @@
 using PrinciPal.Contracts;
-using PrinciPal.McpServer.Services;
-using PrinciPal.McpServer.Tools;
+using PrinciPal.Server.Services;
+using PrinciPal.Server.Tools;
 
-namespace PrinciPal.McpServer.Tests;
+namespace PrinciPal.Server.Tests;
 
 /// <summary>
 /// Regression guard tests that assert maximum character counts for realistic scenarios.

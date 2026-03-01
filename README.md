@@ -17,7 +17,7 @@ Two components work together:
 | Component | Runtime | Role |
 |---|---|---|
 | **Extension** (VSIX) | .NET Framework 4.8 | Reads debugger state via EnvDTE, pushes to MCP server on breakpoint |
-| **McpServer** | .NET 10 (ASP.NET Core) | Receives state, exposes MCP tools for AI editors |
+| **Server** | .NET 10 (ASP.NET Core) | Receives state, exposes MCP tools for AI editors |
 
 ## MCP Tools
 
@@ -36,7 +36,7 @@ Two components work together:
 ### 1. Start the MCP Server
 
 ```bash
-cd src/PrinciPal.McpServer
+cd src/PrinciPal.Server
 dotnet run
 ```
 
@@ -101,10 +101,10 @@ dotnet test          # Run tests (39 tests)
 princiPal/
   src/
     PrinciPal.Contracts/      # Shared DTOs (netstandard2.0)
-    PrinciPal.McpServer/      # MCP server (ASP.NET Core)
+    PrinciPal.Server/      # MCP server (ASP.NET Core)
     PrinciPal.Extension/      # VS 2022 extension (VSIX)
   tests/
-    PrinciPal.McpServer.Tests/  # Unit + integration tests
+    PrinciPal.Server.Tests/  # Unit + integration tests
 ```
 
 ## Testing Plan

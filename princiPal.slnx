@@ -1,11 +1,11 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/PrinciPal.Contracts/PrinciPal.Contracts.csproj" />
-    <Project Path="src/PrinciPal.McpServer/PrinciPal.McpServer.csproj" />
+    <Project Path="src/PrinciPal.Server/PrinciPal.Server.csproj" />
     <Project Path="src/PrinciPal.Extension/PrinciPal.Extension.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/PrinciPal.McpServer.Tests/PrinciPal.McpServer.Tests.csproj" />
+    <Project Path="tests/PrinciPal.Server.Tests/PrinciPal.Server.Tests.csproj" />
   </Folder>
   <Folder Name="/.claude/">
     <File Path="CLAUDE.md" />

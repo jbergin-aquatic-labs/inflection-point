@@ -1,7 +1,7 @@
 using PrinciPal.Contracts;
-using PrinciPal.McpServer.Services;
+using PrinciPal.Server.Services;
 
-namespace PrinciPal.McpServer.Tests;
+namespace PrinciPal.Server.Tests;
 
 public class DebugStateStoreTests
 {

@@ -1,7 +1,7 @@
 using System.Text;
 using PrinciPal.Contracts;
 
-namespace PrinciPal.McpServer.Tools;
+namespace PrinciPal.Server.Tools;
 
 /// <summary>
 /// Token-efficient formatting for debug state output.

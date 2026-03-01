@@ -61,7 +61,7 @@
 
   <!-- MCP server bundling: Release publishes self-contained exe, Debug uses dotnet run -->
   <PropertyGroup>
-    <McpServerProject>$(MSBuildThisFileDirectory)..\PrinciPal.McpServer\PrinciPal.McpServer.csproj</McpServerProject>
+    <McpServerProject>$(MSBuildThisFileDirectory)..\PrinciPal.Server\PrinciPal.Server.csproj</McpServerProject>
     <McpServerPublishDir>$(OutputPath)Server\</McpServerPublishDir>
   </PropertyGroup>
 

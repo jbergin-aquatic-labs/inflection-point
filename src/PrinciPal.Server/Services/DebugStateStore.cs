@@ -1,6 +1,6 @@
 using PrinciPal.Contracts;
 
-namespace PrinciPal.McpServer.Services;
+namespace PrinciPal.Server.Services;
 
 /// <summary>
 /// Thread-safe in-memory store for the latest debug state pushed from the

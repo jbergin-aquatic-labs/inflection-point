@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "PrinciPal.McpServer": {
+    "PrinciPal.Server": {
       "commandName": "Project",
       "applicationUrl": "http://localhost:9229",
       "environmentVariables": {

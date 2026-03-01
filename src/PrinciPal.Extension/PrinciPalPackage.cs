@@ -20,7 +20,7 @@ namespace PrinciPal.Extension
         public const string PackageGuidString = "28d14e0c-5a8f-4b7f-9c12-3e8a6b5d4c9f";
 
         private DebuggerEventHandler? _debuggerEventHandler;
-        private McpServerProcessManager? _processManager;
+        private ServerProcessManager? _processManager;
         private OutputLogger? _logger;
 
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
@@ -68,13 +68,13 @@ namespace PrinciPal.Extension
 
             if (autoStart)
             {
-                if (McpServerProcessManager.IsPrinciPalServerRunning(port))
+                if (ServerProcessManager.IsPrinciPalServerRunning(port))
                 {
                     _logger.Log($"Existing princiPal server detected on port {port}. Reusing it.");
                 }
                 else
                 {
-                    _processManager = new McpServerProcessManager(_logger.Log);
+                    _processManager = new ServerProcessManager(_logger.Log);
                     _processManager.Start(port);
                 }
 

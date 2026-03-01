@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using PrinciPal.Contracts;
 
-namespace PrinciPal.McpServer.Services;
+namespace PrinciPal.Server.Services;
 
 /// <summary>
 /// Manages multiple VS debug sessions. Each session is keyed by a unique ID

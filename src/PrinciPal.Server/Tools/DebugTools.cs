@@ -3,9 +3,9 @@ using System.Text;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using PrinciPal.Contracts;
-using PrinciPal.McpServer.Services;
+using PrinciPal.Server.Services;
 
-namespace PrinciPal.McpServer.Tools;
+namespace PrinciPal.Server.Tools;
 
 /// <summary>
 /// MCP tools that expose the cached Visual Studio debug state to AI clients

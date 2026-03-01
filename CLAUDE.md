@@ -21,10 +21,10 @@ netstat -ano | findstr :9229
 taskkill /PID <pid> /F
 
 # Start server manually (foreground)
-dotnet run --project src/PrinciPal.McpServer/PrinciPal.McpServer.csproj
+dotnet run --project src/PrinciPal.Server/PrinciPal.Server.csproj
 
 # Start server (background, returns PID)
-Start-Process -NoNewWindow -FilePath "dotnet" -ArgumentList "run --project src/PrinciPal.McpServer/PrinciPal.McpServer.csproj" -PassThru
+Start-Process -NoNewWindow -FilePath "dotnet" -ArgumentList "run --project src/PrinciPal.Server/PrinciPal.Server.csproj" -PassThru
 ```
 
 ## Build & Test

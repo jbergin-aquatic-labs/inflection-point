@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\PrinciPal.McpServer\PrinciPal.McpServer.csproj" />
+    <ProjectReference Include="..\..\src\PrinciPal.Server\PrinciPal.Server.csproj" />
     <ProjectReference Include="..\..\src\PrinciPal.Contracts\PrinciPal.Contracts.csproj" />
   </ItemGroup>
 

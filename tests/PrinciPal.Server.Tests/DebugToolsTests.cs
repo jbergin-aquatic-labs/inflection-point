@@ -1,9 +1,9 @@
 using ModelContextProtocol;
 using PrinciPal.Contracts;
-using PrinciPal.McpServer.Services;
-using PrinciPal.McpServer.Tools;
+using PrinciPal.Server.Services;
+using PrinciPal.Server.Tools;
 
-namespace PrinciPal.McpServer.Tests;
+namespace PrinciPal.Server.Tests;
 
 public class DebugToolsTests
 {

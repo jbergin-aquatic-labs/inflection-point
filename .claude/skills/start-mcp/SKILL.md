@@ -16,7 +16,7 @@ Start the princiPal MCP server as a background process.
 
 2. If not running, start it in the background:
    ```
-   Start-Process -NoNewWindow -FilePath "dotnet" -ArgumentList "run --project C:/Repos/VsDebugBridge/src/PrinciPal.McpServer/PrinciPal.McpServer.csproj" -PassThru
+   Start-Process -NoNewWindow -FilePath "dotnet" -ArgumentList "run --project C:/Repos/VsDebugBridge/src/PrinciPal.Server/PrinciPal.Server.csproj" -PassThru
    ```
    This returns the PID.
 
