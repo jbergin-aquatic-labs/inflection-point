@@ -25,21 +25,25 @@ internal static class DebugStateEndpoints
 
         group.MapDelete("/", (ISessionManager mgr, string sessionId) =>
         {
-            var store = mgr.GetSession(sessionId);
-            store?.Clear();
+            mgr.GetSession(sessionId).Switch(
+                some: store => store.Clear(),
+                none: () => { });
             return Results.Ok();
         });
 
         group.MapGet("/history", (ISessionManager mgr, string sessionId) =>
         {
-            var store = mgr.GetSession(sessionId);
-            return Results.Ok(store?.GetHistory() ?? new List<DebugStateSnapshot>());
+            var history = mgr.GetSession(sessionId).Match(
+                some: store => store.GetHistory(),
+                none: () => new List<DebugStateSnapshot>());
+            return Results.Ok(history);
         });
 
         group.MapDelete("/history", (ISessionManager mgr, string sessionId) =>
         {
-            var store = mgr.GetSession(sessionId);
-            store?.ClearHistory();
+            mgr.GetSession(sessionId).Switch(
+                some: store => store.ClearHistory(),
+                none: () => { });
             return Results.Ok();
         });
     }

@@ -1,3 +1,5 @@
+using PrinciPal.Common.Options;
+using PrinciPal.Common.Results;
 using PrinciPal.Domain.Entities;
 using PrinciPal.Domain.ValueObjects;
 
@@ -7,8 +9,8 @@ public interface ISessionManager
 {
     int SessionCount { get; }
     DebugStateStore GetOrCreateSession(string sessionId, string? name = null, string? solutionPath = null);
-    DebugStateStore? GetSession(string sessionId);
-    (DebugStateStore? Store, string? Error) ResolveByNameOrId(string query);
-    bool RemoveSession(string sessionId);
+    Option<DebugStateStore> GetSession(string sessionId);
+    Result<DebugStateStore> ResolveByNameOrId(string query);
+    void RemoveSession(string sessionId);
     List<SessionInfo> GetAllSessions();
 }

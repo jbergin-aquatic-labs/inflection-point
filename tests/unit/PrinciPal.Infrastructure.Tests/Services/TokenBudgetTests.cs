@@ -32,8 +32,9 @@ public class TokenBudgetTests
 
         var result = _service.GetSnapshot(0, session: TestSessionId);
 
-        Assert.True(result.Length <= 400,
-            $"SingleSnapshot_FiveLocals_ThreeFrames: {result.Length} chars exceeds 400 budget");
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Length <= 400,
+            $"SingleSnapshot_FiveLocals_ThreeFrames: {result.Value.Length} chars exceeds 400 budget");
     }
 
     [Fact]
@@ -52,8 +53,9 @@ public class TokenBudgetTests
 
         var result = _service.ExplainExecutionFlow(session: TestSessionId, detail: "changes", depth: 1);
 
-        Assert.True(result.Length <= 1800,
-            $"TenSnapshots_ChangesMode_OneVarChanges: {result.Length} chars exceeds 1800 budget");
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Length <= 1800,
+            $"TenSnapshots_ChangesMode_OneVarChanges: {result.Value.Length} chars exceeds 1800 budget");
     }
 
     [Fact]
@@ -76,8 +78,9 @@ public class TokenBudgetTests
 
         var result = _service.ExplainExecutionFlow(session: TestSessionId, detail: "changes", depth: 1);
 
-        Assert.True(result.Length <= 8000,
-            $"TwentySixSnapshots_DeepLocals_ChangesMode: {result.Length} chars exceeds 8000 budget");
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Length <= 8000,
+            $"TwentySixSnapshots_DeepLocals_ChangesMode: {result.Value.Length} chars exceeds 8000 budget");
     }
 
     [Fact]
@@ -91,8 +94,9 @@ public class TokenBudgetTests
 
         var result = _service.ExplainExecutionFlow(session: TestSessionId, detail: "full", depth: 1);
 
-        Assert.True(result.Length <= 3000,
-            $"TenSnapshots_FullMode: {result.Length} chars exceeds 3000 budget");
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Length <= 3000,
+            $"TenSnapshots_FullMode: {result.Value.Length} chars exceeds 3000 budget");
     }
 
     [Fact]
@@ -110,8 +114,9 @@ public class TokenBudgetTests
 
         var result = _service.ExplainExecutionFlow(session: TestSessionId, detail: "summary", depth: 1);
 
-        Assert.True(result.Length <= 2500,
-            $"TwentySixSnapshots_SummaryMode: {result.Length} chars exceeds 2500 budget");
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Length <= 2500,
+            $"TwentySixSnapshots_SummaryMode: {result.Value.Length} chars exceeds 2500 budget");
     }
 
     [Fact]
@@ -122,8 +127,9 @@ public class TokenBudgetTests
 
         var result = _service.GetLocals(session: TestSessionId, depth: 0);
 
-        Assert.True(result.Length <= 350,
-            $"GetLocals_DepthZero_NoExpansion: {result.Length} chars exceeds 350 budget");
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Length <= 350,
+            $"GetLocals_DepthZero_NoExpansion: {result.Value.Length} chars exceeds 350 budget");
     }
 
     [Fact]
@@ -134,8 +140,9 @@ public class TokenBudgetTests
 
         var result = _service.GetLocals(session: TestSessionId, depth: 2);
 
-        Assert.True(result.Length <= 1200,
-            $"GetLocals_DepthTwo_TwoLevels: {result.Length} chars exceeds 1200 budget");
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Length <= 1200,
+            $"GetLocals_DepthTwo_TwoLevels: {result.Value.Length} chars exceeds 1200 budget");
     }
 
     [Fact]
@@ -149,9 +156,10 @@ public class TokenBudgetTests
 
         var result = _service.ExplainExecutionFlow(session: TestSessionId, detail: "full", depth: 1, start: 10, count: 3);
 
-        Assert.True(result.Length <= 1000,
-            $"Pagination_ThreeOfTwenty: {result.Length} chars exceeds 1000 budget");
-        Assert.Contains("20 total, showing 3 from #10", result);
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Length <= 1000,
+            $"Pagination_ThreeOfTwenty: {result.Value.Length} chars exceeds 1000 budget");
+        Assert.Contains("20 total, showing 3 from #10", result.Value);
     }
 
     #region Helpers

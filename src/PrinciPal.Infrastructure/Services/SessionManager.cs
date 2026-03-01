@@ -1,5 +1,8 @@
 using System.Collections.Concurrent;
 using PrinciPal.Application.Abstractions;
+using PrinciPal.Common.Errors.Session;
+using PrinciPal.Common.Options;
+using PrinciPal.Common.Results;
 using PrinciPal.Domain.Entities;
 using PrinciPal.Domain.ValueObjects;
 
@@ -44,22 +47,24 @@ public class SessionManager : ISessionManager
     }
 
     /// <summary>
-    /// Gets a session's store by its unique ID, or null if not found.
+    /// Gets a session's store by its unique ID, or None if not found.
     /// </summary>
-    public DebugStateStore? GetSession(string sessionId)
+    public Option<DebugStateStore> GetSession(string sessionId)
     {
-        return _sessions.TryGetValue(sessionId, out var entry) ? entry.Store : null;
+        return _sessions.TryGetValue(sessionId, out var entry)
+            ? Option.Some(entry.Store)
+            : Option<DebugStateStore>.None;
     }
 
     /// <summary>
     /// Resolves a query string (name or ID) to a session store.
-    /// Returns (store, null) on success, or (null, errorMessage) on failure.
+    /// Returns Success(store) on match, or Failure with appropriate error.
     /// </summary>
-    public (DebugStateStore? Store, string? Error) ResolveByNameOrId(string query)
+    public Result<DebugStateStore> ResolveByNameOrId(string query)
     {
         // Try exact ID match first
         if (_sessions.TryGetValue(query, out var entry))
-            return (entry.Store, null);
+            return entry.Store;
 
         // Try name match
         var matches = _sessions.Values
@@ -67,23 +72,23 @@ public class SessionManager : ISessionManager
             .ToList();
 
         if (matches.Count == 1)
-            return (matches[0].Store, null);
+            return matches[0].Store;
 
         if (matches.Count > 1)
         {
             var lines = matches.Select(m => $"  {m.Info.Name} [{m.Info.SessionId}] - {m.Info.SolutionPath}");
-            return (null, $"Multiple sessions named '{query}'. Use the session ID instead:\n{string.Join("\n", lines)}");
+            return new AmbiguousSessionError(query, string.Join("\n", lines));
         }
 
-        return (null, $"Session '{query}' not found. Use list_sessions to see connected VS instances.");
+        return new SessionNotFoundError(query);
     }
 
     /// <summary>
     /// Removes a session and all its state.
     /// </summary>
-    public bool RemoveSession(string sessionId)
+    public void RemoveSession(string sessionId)
     {
-        return _sessions.TryRemove(sessionId, out _);
+        _sessions.TryRemove(sessionId, out _);
     }
 
     /// <summary>

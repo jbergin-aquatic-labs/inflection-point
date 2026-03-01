@@ -1,5 +1,4 @@
 using PrinciPal.Common.Abstractions;
-using PrinciPal.Common.Errors;
 using PrinciPal.Common.Results;
 
 namespace PrinciPal.Common.Extensions;

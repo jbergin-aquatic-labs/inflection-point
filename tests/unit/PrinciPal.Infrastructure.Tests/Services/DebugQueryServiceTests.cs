@@ -53,10 +53,11 @@ public class DebugQueryServiceTests
     {
         var result = _service.ListSessions();
 
-        Assert.Contains("1 session(s):", result);
-        Assert.Contains(TestSessionName, result);
-        Assert.Contains(TestSessionId, result);
-        Assert.Contains("idle", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("1 session(s):", result.Value);
+        Assert.Contains(TestSessionName, result.Value);
+        Assert.Contains(TestSessionId, result.Value);
+        Assert.Contains("idle", result.Value);
     }
 
     [Fact]
@@ -66,7 +67,8 @@ public class DebugQueryServiceTests
 
         var result = _service.ListSessions();
 
-        Assert.Contains("debugging", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("debugging", result.Value);
     }
 
     [Fact]
@@ -76,9 +78,10 @@ public class DebugQueryServiceTests
 
         var result = _service.ListSessions();
 
-        Assert.Contains("2 session(s):", result);
-        Assert.Contains(TestSessionName, result);
-        Assert.Contains("OtherApp", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("2 session(s):", result.Value);
+        Assert.Contains(TestSessionName, result.Value);
+        Assert.Contains("OtherApp", result.Value);
 
         // Cleanup
         _sessionManager.RemoveSession("e5f6a7b8");
@@ -97,7 +100,8 @@ public class DebugQueryServiceTests
         // Query by unique name
         var result = _service.GetDebugState(session: TestSessionName);
 
-        Assert.Contains("[loc]", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("[loc]", result.Value);
 
         // Cleanup
         _sessionManager.RemoveSession("e5f6a7b8");
@@ -112,18 +116,21 @@ public class DebugQueryServiceTests
         // Query by ID
         var result = _service.GetDebugState(session: TestSessionId);
 
-        Assert.Contains("[loc]", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("[loc]", result.Value);
 
         // Cleanup
         _sessionManager.RemoveSession("e5f6a7b8");
     }
 
     [Fact]
-    public void ExplicitSession_ThrowsKeyNotFoundException_WhenNotFound()
+    public void ExplicitSession_ReturnsSessionNotFound_WhenNotFound()
     {
-        var ex = Assert.Throws<KeyNotFoundException>(() => _service.GetDebugState(session: "NonExistent"));
+        var result = _service.GetDebugState(session: "NonExistent");
 
-        Assert.Contains("Session 'NonExistent' not found", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Session.NotFound", result.Error.Code);
+        Assert.Contains("NonExistent", result.Error.Description);
     }
 
     [Fact]
@@ -134,14 +141,16 @@ public class DebugQueryServiceTests
         _sessionManager.GetOrCreateSession("e5f6a7b8", TestSessionName, @"C:\other\TestApp.sln");
 
         // Query by name should fail because it's ambiguous
-        var ex = Assert.Throws<KeyNotFoundException>(() => _service.GetDebugState(session: TestSessionName));
-        Assert.Contains("Multiple sessions named", ex.Message);
-        Assert.Contains(TestSessionId, ex.Message);
-        Assert.Contains("e5f6a7b8", ex.Message);
+        var ambiguous = _service.GetDebugState(session: TestSessionName);
+        Assert.True(ambiguous.IsFailure);
+        Assert.Equal("Session.Ambiguous", ambiguous.Error.Code);
+        Assert.Contains(TestSessionId, ambiguous.Error.Description);
+        Assert.Contains("e5f6a7b8", ambiguous.Error.Description);
 
         // Query by ID should work
         var result = _service.GetDebugState(session: TestSessionId);
-        Assert.Contains("[loc]", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("[loc]", result.Value);
 
         // Cleanup
         _sessionManager.RemoveSession("e5f6a7b8");
@@ -152,21 +161,23 @@ public class DebugQueryServiceTests
     #region GetDebugState
 
     [Fact]
-    public void GetDebugState_ThrowsInvalidOperationException_WhenNoStateAvailable()
+    public void GetDebugState_ReturnsNoDebugState_WhenNoStateAvailable()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => _service.GetDebugState(session: TestSessionId));
+        var result = _service.GetDebugState(session: TestSessionId);
 
-        Assert.Contains("No debug state available", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.NoState", result.Error.Code);
     }
 
     [Fact]
-    public void GetDebugState_ThrowsInvalidOperationException_WhenNotInBreakMode()
+    public void GetDebugState_ReturnsNotInBreakMode_WhenNotInBreakMode()
     {
         _store.Update(new DebugState { IsInBreakMode = false });
 
-        var ex = Assert.Throws<InvalidOperationException>(() => _service.GetDebugState(session: TestSessionId));
+        var result = _service.GetDebugState(session: TestSessionId);
 
-        Assert.Contains("not in break mode", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.NotInBreakMode", result.Error.Code);
     }
 
     [Fact]
@@ -193,12 +204,13 @@ public class DebugQueryServiceTests
 
         var result = _service.GetDebugState(session: TestSessionId);
 
-        Assert.Contains("[loc]", result);
-        Assert.Contains("@ Run (App.cs:10) [TestProject]", result);
-        Assert.Contains("[locals]", result);
-        Assert.Contains("count:int=42", result);
-        Assert.Contains("[stack]", result);
-        Assert.Contains("0: Run (App.cs:10)", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("[loc]", result.Value);
+        Assert.Contains("@ Run (App.cs:10) [TestProject]", result.Value);
+        Assert.Contains("[locals]", result.Value);
+        Assert.Contains("count:int=42", result.Value);
+        Assert.Contains("[stack]", result.Value);
+        Assert.Contains("0: Run (App.cs:10)", result.Value);
     }
 
     [Fact]
@@ -210,7 +222,8 @@ public class DebugQueryServiceTests
 
         var result = _service.GetDebugState(session: TestSessionId);
 
-        Assert.DoesNotContain("[loc]", result);
+        Assert.True(result.IsSuccess);
+        Assert.DoesNotContain("[loc]", result.Value);
     }
 
     #endregion
@@ -240,10 +253,11 @@ public class DebugQueryServiceTests
 
         var result = _service.GetLocals(session: TestSessionId);
 
-        Assert.Contains("[locals]", result);
-        Assert.Contains("person:Person={Person}", result);
-        Assert.Contains(".Name:string=\"Alice\"", result);
-        Assert.Contains(".Age:int=30", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("[locals]", result.Value);
+        Assert.Contains("person:Person={Person}", result.Value);
+        Assert.Contains(".Name:string=\"Alice\"", result.Value);
+        Assert.Contains(".Age:int=30", result.Value);
     }
 
     [Fact]
@@ -253,15 +267,17 @@ public class DebugQueryServiceTests
 
         var result = _service.GetLocals(session: TestSessionId);
 
-        Assert.Equal("No local variables in the current scope.", result);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("No local variables in the current scope.", result.Value);
     }
 
     [Fact]
-    public void GetLocals_ThrowsInvalidOperationException_WhenNoState()
+    public void GetLocals_ReturnsNoDebugState_WhenNoState()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => _service.GetLocals(session: TestSessionId));
+        var result = _service.GetLocals(session: TestSessionId);
 
-        Assert.Contains("No debug state available", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.NoState", result.Error.Code);
     }
 
     [Fact]
@@ -276,7 +292,8 @@ public class DebugQueryServiceTests
 
         var result = _service.GetLocals(session: TestSessionId);
 
-        Assert.Contains("[!]", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("[!]", result.Value);
     }
 
     #endregion
@@ -297,10 +314,11 @@ public class DebugQueryServiceTests
 
         var result = _service.GetCallStack(session: TestSessionId);
 
-        Assert.Contains("[stack]", result);
-        Assert.Contains("0: Inner (Foo.cs:15)", result);
-        Assert.Contains("1: Outer (Bar.cs:30)", result);
-        Assert.Contains("2: ExternalCall [ext]", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("[stack]", result.Value);
+        Assert.Contains("0: Inner (Foo.cs:15)", result.Value);
+        Assert.Contains("1: Outer (Bar.cs:30)", result.Value);
+        Assert.Contains("2: ExternalCall [ext]", result.Value);
     }
 
     [Fact]
@@ -310,17 +328,19 @@ public class DebugQueryServiceTests
 
         var result = _service.GetCallStack(session: TestSessionId);
 
-        Assert.Equal("Call stack is empty.", result);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Call stack is empty.", result.Value);
     }
 
     [Fact]
-    public void GetCallStack_ThrowsInvalidOperationException_WhenNotInBreakMode()
+    public void GetCallStack_ReturnsNotInBreakMode_WhenNotInBreakMode()
     {
         _store.Update(new DebugState { IsInBreakMode = false });
 
-        var ex = Assert.Throws<InvalidOperationException>(() => _service.GetCallStack(session: TestSessionId));
+        var result = _service.GetCallStack(session: TestSessionId);
 
-        Assert.Contains("not in break mode", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.NotInBreakMode", result.Error.Code);
     }
 
     #endregion
@@ -328,15 +348,16 @@ public class DebugQueryServiceTests
     #region GetSourceContext
 
     [Fact]
-    public void GetSourceContext_ThrowsInvalidOperationException_WhenNoLocation()
+    public void GetSourceContext_ReturnsNoSourceLocation_WhenNoLocation()
     {
         var state = CreateBreakModeState();
         state.CurrentLocation = null;
         _store.Update(state);
 
-        var ex = Assert.Throws<InvalidOperationException>(() => _service.GetSourceContext(session: TestSessionId));
+        var result = _service.GetSourceContext(session: TestSessionId);
 
-        Assert.Contains("No source location information available", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.NoSourceLocation", result.Error.Code);
     }
 
     [Fact]
@@ -354,8 +375,9 @@ public class DebugQueryServiceTests
 
         var result = _service.GetSourceContext(session: TestSessionId);
 
-        Assert.Contains("Source file not accessible", result);
-        Assert.Contains(@"C:\nonexistent\path\File.cs", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("Source file not accessible", result.Value);
+        Assert.Contains(@"C:\nonexistent\path\File.cs", result.Value);
     }
 
     [Fact]
@@ -381,12 +403,13 @@ public class DebugQueryServiceTests
 
             var result = _service.GetSourceContext(session: TestSessionId);
 
-            Assert.Contains("## Source:", result);
-            Assert.Contains("**Function**: `TestMethod`", result);
-            Assert.Contains("**Line 15**", result);
-            Assert.Contains("```csharp", result);
-            Assert.Contains(">>>", result);
-            Assert.Contains("// Line 15", result);
+            Assert.True(result.IsSuccess);
+            Assert.Contains("## Source:", result.Value);
+            Assert.Contains("**Function**: `TestMethod`", result.Value);
+            Assert.Contains("**Line 15**", result.Value);
+            Assert.Contains("```csharp", result.Value);
+            Assert.Contains(">>>", result.Value);
+            Assert.Contains("// Line 15", result.Value);
         }
         finally
         {
@@ -425,11 +448,12 @@ public class DebugQueryServiceTests
 
         var result = _service.GetBreakpoints(session: TestSessionId);
 
-        Assert.Contains("[breakpoints]", result);
-        Assert.Contains("Controller.cs:50 (on)", result);
-        Assert.Contains("HandleRequest", result);
-        Assert.Contains("when id > 0", result);
-        Assert.Contains("Service.cs:100 (off)", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("[breakpoints]", result.Value);
+        Assert.Contains("Controller.cs:50 (on)", result.Value);
+        Assert.Contains("HandleRequest", result.Value);
+        Assert.Contains("when id > 0", result.Value);
+        Assert.Contains("Service.cs:100 (off)", result.Value);
     }
 
     [Fact]
@@ -439,15 +463,17 @@ public class DebugQueryServiceTests
 
         var result = _service.GetBreakpoints(session: TestSessionId);
 
-        Assert.Equal("No breakpoints are set.", result);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("No breakpoints are set.", result.Value);
     }
 
     [Fact]
-    public void GetBreakpoints_ThrowsInvalidOperationException_WhenNoState()
+    public void GetBreakpoints_ReturnsNoDebugState_WhenNoState()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => _service.GetBreakpoints(session: TestSessionId));
+        var result = _service.GetBreakpoints(session: TestSessionId);
 
-        Assert.Contains("No debug state available", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.NoState", result.Error.Code);
     }
 
     [Fact]
@@ -465,7 +491,8 @@ public class DebugQueryServiceTests
 
         var result = _service.GetBreakpoints(session: TestSessionId);
 
-        Assert.Contains("Test.cs:1 (on)", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("Test.cs:1 (on)", result.Value);
     }
 
     #endregion
@@ -473,11 +500,12 @@ public class DebugQueryServiceTests
     #region GetExpressionResult
 
     [Fact]
-    public void GetExpressionResult_ThrowsInvalidOperationException_WhenNoExpressionAvailable()
+    public void GetExpressionResult_ReturnsNoExpressionResult_WhenNoExpressionAvailable()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => _service.GetExpressionResult(session: TestSessionId));
+        var result = _service.GetExpressionResult(session: TestSessionId);
 
-        Assert.Contains("No expression result available", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.NoExpressionResult", result.Error.Code);
     }
 
     [Fact]
@@ -493,8 +521,9 @@ public class DebugQueryServiceTests
 
         var result = _service.GetExpressionResult(session: TestSessionId);
 
-        Assert.Contains("expr list.Count:int=3", result);
-        Assert.DoesNotContain("[!]", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("expr list.Count:int=3", result.Value);
+        Assert.DoesNotContain("[!]", result.Value);
     }
 
     [Fact]
@@ -515,9 +544,10 @@ public class DebugQueryServiceTests
 
         var result = _service.GetExpressionResult(session: TestSessionId);
 
-        Assert.Contains("expr myObj:MyClass={MyClass}", result);
-        Assert.Contains(".Id:int=7", result);
-        Assert.Contains(".Label:string=\"test\"", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("expr myObj:MyClass={MyClass}", result.Value);
+        Assert.Contains(".Id:int=7", result.Value);
+        Assert.Contains(".Label:string=\"test\"", result.Value);
     }
 
     #endregion
@@ -547,17 +577,19 @@ public class DebugQueryServiceTests
 
         var result = _service.ExplainCurrentState(session: TestSessionId);
 
-        Assert.Contains("Source file not accessible", result);
-        Assert.Contains("x:int=10", result);
-        Assert.Contains("0: Calculate (Calc.cs:5)", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("Source file not accessible", result.Value);
+        Assert.Contains("x:int=10", result.Value);
+        Assert.Contains("0: Calculate (Calc.cs:5)", result.Value);
     }
 
     [Fact]
-    public void ExplainCurrentState_ThrowsInvalidOperationException_WhenAllSectionsEmpty()
+    public void ExplainCurrentState_ReturnsNoDebugState_WhenAllSectionsEmpty()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => _service.ExplainCurrentState(session: TestSessionId));
+        var result = _service.ExplainCurrentState(session: TestSessionId);
 
-        Assert.Contains("No debug state available", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.NoState", result.Error.Code);
     }
 
     #endregion
@@ -565,11 +597,12 @@ public class DebugQueryServiceTests
     #region GetBreakpointHistory
 
     [Fact]
-    public void GetBreakpointHistory_ThrowsInvalidOperationException_WhenNoHistory()
+    public void GetBreakpointHistory_ReturnsNoHistory_WhenNoHistory()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => _service.GetBreakpointHistory(session: TestSessionId));
+        var result = _service.GetBreakpointHistory(session: TestSessionId);
 
-        Assert.Contains("No breakpoint history available", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.NoHistory", result.Error.Code);
     }
 
     [Fact]
@@ -591,15 +624,16 @@ public class DebugQueryServiceTests
 
         var result = _service.GetBreakpointHistory(session: TestSessionId);
 
-        Assert.Contains("2 snapshots", result);
-        Assert.Contains("#0", result);
-        Assert.Contains("#1", result);
-        Assert.Contains("MethodA", result);
-        Assert.Contains("MethodB", result);
-        Assert.Contains("A.cs:10", result);
-        Assert.Contains("B.cs:20", result);
-        Assert.Contains("1 locals", result);
-        Assert.Contains("2 locals", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("2 snapshots", result.Value);
+        Assert.Contains("#0", result.Value);
+        Assert.Contains("#1", result.Value);
+        Assert.Contains("MethodA", result.Value);
+        Assert.Contains("MethodB", result.Value);
+        Assert.Contains("A.cs:10", result.Value);
+        Assert.Contains("B.cs:20", result.Value);
+        Assert.Contains("1 locals", result.Value);
+        Assert.Contains("2 locals", result.Value);
     }
 
     #endregion
@@ -607,11 +641,13 @@ public class DebugQueryServiceTests
     #region GetSnapshot
 
     [Fact]
-    public void GetSnapshot_ThrowsKeyNotFoundException_WhenNotFound()
+    public void GetSnapshot_ReturnsSnapshotNotFound_WhenNotFound()
     {
-        var ex = Assert.Throws<KeyNotFoundException>(() => _service.GetSnapshot(999, session: TestSessionId));
+        var result = _service.GetSnapshot(999, session: TestSessionId);
 
-        Assert.Contains("Snapshot #999 not found", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.SnapshotNotFound", result.Error.Code);
+        Assert.Contains("999", result.Error.Description);
     }
 
     [Fact]
@@ -630,12 +666,13 @@ public class DebugQueryServiceTests
 
         var result = _service.GetSnapshot(0, session: TestSessionId);
 
-        Assert.Contains("#0", result);
-        Assert.Contains("@ DoWork (File.cs:42) [App]", result);
-        Assert.Contains("[locals]", result);
-        Assert.Contains("count:int=5", result);
-        Assert.Contains("[stack]", result);
-        Assert.Contains("0: DoWork (File.cs:42)", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("#0", result.Value);
+        Assert.Contains("@ DoWork (File.cs:42) [App]", result.Value);
+        Assert.Contains("[locals]", result.Value);
+        Assert.Contains("count:int=5", result.Value);
+        Assert.Contains("[stack]", result.Value);
+        Assert.Contains("0: DoWork (File.cs:42)", result.Value);
     }
 
     #endregion
@@ -643,11 +680,12 @@ public class DebugQueryServiceTests
     #region ExplainExecutionFlow
 
     [Fact]
-    public void ExplainExecutionFlow_ThrowsInvalidOperationException_WhenNoHistory()
+    public void ExplainExecutionFlow_ReturnsNoHistory_WhenNoHistory()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => _service.ExplainExecutionFlow(session: TestSessionId));
+        var result = _service.ExplainExecutionFlow(session: TestSessionId);
 
-        Assert.Contains("No breakpoint history available", ex.Message);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.NoHistory", result.Error.Code);
     }
 
     [Fact]
@@ -678,19 +716,20 @@ public class DebugQueryServiceTests
 
         var result = _service.ExplainExecutionFlow(session: TestSessionId);
 
+        Assert.True(result.IsSuccess);
         // Default detail=changes: first snapshot full, second shows diff
-        Assert.Contains("Trace (2 snapshots)", result);
-        Assert.Contains("#0", result);
-        Assert.Contains("#1", result);
-        Assert.Contains("Begin (Start.cs:5)", result);
-        Assert.Contains("Process (Middle.cs:15)", result);
+        Assert.Contains("Trace (2 snapshots)", result.Value);
+        Assert.Contains("#0", result.Value);
+        Assert.Contains("#1", result.Value);
+        Assert.Contains("Begin (Start.cs:5)", result.Value);
+        Assert.Contains("Process (Middle.cs:15)", result.Value);
         // First snapshot: full locals
-        Assert.Contains("input:string=\"hello\"", result);
+        Assert.Contains("input:string=\"hello\"", result.Value);
         // Second snapshot: diff
-        Assert.Contains("[changed]", result);
-        Assert.Contains("input:string=\"HELLO\" (was \"hello\")", result);
-        Assert.Contains("[new]", result);
-        Assert.Contains("processed:bool=true", result);
+        Assert.Contains("[changed]", result.Value);
+        Assert.Contains("input:string=\"HELLO\" (was \"hello\")", result.Value);
+        Assert.Contains("[new]", result.Value);
+        Assert.Contains("processed:bool=true", result.Value);
     }
 
     #endregion
@@ -745,11 +784,13 @@ public class DebugQueryServiceTests
     {
         PushSnapshots(55); // cap=50, so indices 0..4 evicted
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => _service.GetSnapshot(0, session: TestSessionId));
+        var result = _service.GetSnapshot(0, session: TestSessionId);
 
-        Assert.Contains("evicted", ex.Message);
-        Assert.Contains("last 50", ex.Message);
-        Assert.Contains("#5", ex.Message); // oldest available
+        Assert.True(result.IsFailure);
+        Assert.Equal("Debugger.SnapshotEvicted", result.Error.Code);
+        Assert.Contains("evicted", result.Error.Description);
+        Assert.Contains("last 50", result.Error.Description);
+        Assert.Contains("#5", result.Error.Description); // oldest available
     }
 
     [Fact]
@@ -759,11 +800,12 @@ public class DebugQueryServiceTests
 
         var result = _service.GetSnapshot(5, session: TestSessionId);
 
-        Assert.Contains("#5", result);
-        Assert.Contains("Method5", result);
-        Assert.Contains("File5.cs:6", result);
-        Assert.Contains("var5:int=50", result);
-        Assert.Contains("[stack]", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("#5", result.Value);
+        Assert.Contains("Method5", result.Value);
+        Assert.Contains("File5.cs:6", result.Value);
+        Assert.Contains("var5:int=50", result.Value);
+        Assert.Contains("[stack]", result.Value);
     }
 
     [Fact]
@@ -773,8 +815,9 @@ public class DebugQueryServiceTests
 
         var result = _service.GetBreakpointHistory(session: TestSessionId);
 
-        Assert.Contains("50 of 55", result);
-        Assert.Contains("#5", result); // first entry
+        Assert.True(result.IsSuccess);
+        Assert.Contains("50 of 55", result.Value);
+        Assert.Contains("#5", result.Value); // first entry
     }
 
     [Fact]
@@ -784,8 +827,9 @@ public class DebugQueryServiceTests
 
         var result = _service.GetBreakpointHistory(session: TestSessionId);
 
-        Assert.Contains("10 snapshots", result);
-        Assert.DoesNotContain(" of ", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("10 snapshots", result.Value);
+        Assert.DoesNotContain(" of ", result.Value);
     }
 
     [Fact]
@@ -795,9 +839,10 @@ public class DebugQueryServiceTests
 
         var result = _service.ExplainExecutionFlow(session: TestSessionId, detail: "changes");
 
+        Assert.True(result.IsSuccess);
         // First surviving snapshot (#5) should show full locals, not a diff
-        Assert.Contains("var5:int=50", result);
-        Assert.Contains("[locals]", result);
+        Assert.Contains("var5:int=50", result.Value);
+        Assert.Contains("[locals]", result.Value);
     }
 
     [Fact]
@@ -807,7 +852,8 @@ public class DebugQueryServiceTests
 
         var result = _service.ExplainExecutionFlow(session: TestSessionId);
 
-        Assert.Contains("50 of 55", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("50 of 55", result.Value);
     }
 
     [Fact]
@@ -817,11 +863,12 @@ public class DebugQueryServiceTests
 
         var result = _service.ExplainExecutionFlow(session: TestSessionId, start: 10, count: 3);
 
-        Assert.Contains("showing 3 from #10", result);
-        Assert.Contains("#10", result);
-        Assert.Contains("#11", result);
-        Assert.Contains("#12", result);
-        Assert.DoesNotContain("#13", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("showing 3 from #10", result.Value);
+        Assert.Contains("#10", result.Value);
+        Assert.Contains("#11", result.Value);
+        Assert.Contains("#12", result.Value);
+        Assert.DoesNotContain("#13", result.Value);
     }
 
     [Fact]
@@ -832,17 +879,18 @@ public class DebugQueryServiceTests
         // Oldest surviving = index 5
         var result = _service.GetSnapshot(5, session: TestSessionId, depth: 2);
 
+        Assert.True(result.IsSuccess);
         // Location
-        Assert.Contains("Method5", result);
-        Assert.Contains("File5.cs:6", result);
-        Assert.Contains("[Proj5]", result);
+        Assert.Contains("Method5", result.Value);
+        Assert.Contains("File5.cs:6", result.Value);
+        Assert.Contains("[Proj5]", result.Value);
         // Locals with members
-        Assert.Contains("var5:int=50", result);
-        Assert.Contains(".Inner:string=\"val5\"", result);
+        Assert.Contains("var5:int=50", result.Value);
+        Assert.Contains(".Inner:string=\"val5\"", result.Value);
         // Call stack
-        Assert.Contains("[stack]", result);
-        Assert.Contains("0: Method5 (File5.cs:6)", result);
-        Assert.Contains("1: Main (Program.cs:10)", result);
+        Assert.Contains("[stack]", result.Value);
+        Assert.Contains("0: Method5 (File5.cs:6)", result.Value);
+        Assert.Contains("1: Main (Program.cs:10)", result.Value);
     }
 
     #endregion
@@ -869,11 +917,13 @@ public class DebugQueryServiceTests
         var testResult = _service.GetDebugState(session: TestSessionId);
         var otherResult = _service.GetDebugState(session: "OtherApp");
 
-        Assert.Contains("fromTestApp", testResult);
-        Assert.DoesNotContain("fromOtherApp", testResult);
+        Assert.True(testResult.IsSuccess);
+        Assert.True(otherResult.IsSuccess);
+        Assert.Contains("fromTestApp", testResult.Value);
+        Assert.DoesNotContain("fromOtherApp", testResult.Value);
 
-        Assert.Contains("fromOtherApp", otherResult);
-        Assert.DoesNotContain("fromTestApp", otherResult);
+        Assert.Contains("fromOtherApp", otherResult.Value);
+        Assert.DoesNotContain("fromTestApp", otherResult.Value);
 
         // Cleanup
         _sessionManager.RemoveSession("e5f6a7b8");
@@ -885,8 +935,9 @@ public class DebugQueryServiceTests
         _sessionManager.GetOrCreateSession("temp1234", "TempSession", @"C:\src\Temp.sln");
         _sessionManager.RemoveSession("temp1234");
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => _service.GetDebugState(session: "temp1234"));
-        Assert.Contains("Session 'temp1234' not found", ex.Message);
+        var result = _service.GetDebugState(session: "temp1234");
+        Assert.True(result.IsFailure);
+        Assert.Equal("Session.NotFound", result.Error.Code);
     }
 
     #endregion
@@ -907,8 +958,9 @@ public class DebugQueryServiceTests
 
         var result = _service.ExplainCurrentState(session: TestSessionId);
 
-        Assert.Contains("flag:bool=true", result);
-        Assert.Contains("Call stack is empty.", result);
+        Assert.True(result.IsSuccess);
+        Assert.Contains("flag:bool=true", result.Value);
+        Assert.Contains("Call stack is empty.", result.Value);
     }
 
     #endregion
