@@ -21,8 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\VsDebugBridge.McpServer\VsDebugBridge.McpServer.csproj" />
-    <ProjectReference Include="..\..\src\VsDebugBridge.Contracts\VsDebugBridge.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\PrinciPal.McpServer\PrinciPal.McpServer.csproj" />
+    <ProjectReference Include="..\..\src\PrinciPal.Contracts\PrinciPal.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

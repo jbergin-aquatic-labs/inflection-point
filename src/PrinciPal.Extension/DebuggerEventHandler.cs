@@ -8,10 +8,10 @@ using System.Threading.Tasks;
 using EnvDTE;
 using EnvDTE80;
 using Microsoft.VisualStudio.Shell;
-using VsDebugBridge.Contracts;
+using PrinciPal.Contracts;
 using Task = System.Threading.Tasks.Task;
 
-namespace VsDebugBridge.VsExtension
+namespace PrinciPal.Extension
 {
     /// <summary>
     /// Subscribes to VS debugger events and pushes debug state to the MCP server.
@@ -58,11 +58,11 @@ namespace VsDebugBridge.VsExtension
         private void OnEnterBreakMode(dbgEventReason reason, ref dbgExecutionAction executionAction)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            Debug.WriteLine($"VsDebugBridge: Entered break mode. Reason: {reason}");
+            Debug.WriteLine($"PrinciPal: Entered break mode. Reason: {reason}");
 
             if (IsDebuggingVisualStudio())
             {
-                Debug.WriteLine("VsDebugBridge: Skipping push — this instance is debugging another VS instance.");
+                Debug.WriteLine("PrinciPal: Skipping push — this instance is debugging another VS instance.");
                 return;
             }
 
@@ -71,7 +71,7 @@ namespace VsDebugBridge.VsExtension
 
         private void OnEnterDesignMode(dbgEventReason reason)
         {
-            Debug.WriteLine($"VsDebugBridge: Entered design mode (debugging stopped). Reason: {reason}");
+            Debug.WriteLine($"PrinciPal: Entered design mode (debugging stopped). Reason: {reason}");
             _ = ClearDebugStateAsync();
         }
 
@@ -84,21 +84,21 @@ namespace VsDebugBridge.VsExtension
                     try
                     {
                         var response = await _httpClient.DeleteAsync("/api/debug-state");
-                        Debug.WriteLine($"VsDebugBridge: Cleared debug state. Status: {response.StatusCode}");
+                        Debug.WriteLine($"PrinciPal: Cleared debug state. Status: {response.StatusCode}");
                     }
                     catch (HttpRequestException ex)
                     {
-                        Debug.WriteLine($"VsDebugBridge: MCP server not reachable at {McpServerBaseUrl}. {ex.Message}");
+                        Debug.WriteLine($"PrinciPal: MCP server not reachable at {McpServerBaseUrl}. {ex.Message}");
                     }
                     catch (TaskCanceledException)
                     {
-                        Debug.WriteLine("VsDebugBridge: Clear request timed out.");
+                        Debug.WriteLine("PrinciPal: Clear request timed out.");
                     }
                 });
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"VsDebugBridge: Error clearing debug state: {ex.Message}");
+                Debug.WriteLine($"PrinciPal: Error clearing debug state: {ex.Message}");
             }
         }
 
@@ -139,7 +139,7 @@ namespace VsDebugBridge.VsExtension
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"VsDebugBridge: Error checking debugged processes: {ex.Message}");
+                Debug.WriteLine($"PrinciPal: Error checking debugged processes: {ex.Message}");
             }
             return false;
         }
@@ -163,21 +163,21 @@ namespace VsDebugBridge.VsExtension
                     try
                     {
                         var response = await _httpClient.PostAsync("/api/debug-state", content);
-                        Debug.WriteLine($"VsDebugBridge: Pushed debug state. Status: {response.StatusCode}");
+                        Debug.WriteLine($"PrinciPal: Pushed debug state. Status: {response.StatusCode}");
                     }
                     catch (HttpRequestException ex)
                     {
-                        Debug.WriteLine($"VsDebugBridge: MCP server not reachable at {McpServerBaseUrl}. {ex.Message}");
+                        Debug.WriteLine($"PrinciPal: MCP server not reachable at {McpServerBaseUrl}. {ex.Message}");
                     }
                     catch (TaskCanceledException)
                     {
-                        Debug.WriteLine("VsDebugBridge: Push timed out.");
+                        Debug.WriteLine("PrinciPal: Push timed out.");
                     }
                 });
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"VsDebugBridge: Error pushing debug state: {ex.Message}");
+                Debug.WriteLine($"PrinciPal: Error pushing debug state: {ex.Message}");
             }
         }
 
@@ -222,7 +222,7 @@ namespace VsDebugBridge.VsExtension
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"VsDebugBridge: Error reading location: {ex.Message}");
+                Debug.WriteLine($"PrinciPal: Error reading location: {ex.Message}");
             }
 
             // Local variables
@@ -236,7 +236,7 @@ namespace VsDebugBridge.VsExtension
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"VsDebugBridge: Error reading locals: {ex.Message}");
+                Debug.WriteLine($"PrinciPal: Error reading locals: {ex.Message}");
             }
 
             // Call stack
@@ -261,7 +261,7 @@ namespace VsDebugBridge.VsExtension
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"VsDebugBridge: Error reading call stack: {ex.Message}");
+                Debug.WriteLine($"PrinciPal: Error reading call stack: {ex.Message}");
             }
 
             // Breakpoints
@@ -284,7 +284,7 @@ namespace VsDebugBridge.VsExtension
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"VsDebugBridge: Error reading breakpoints: {ex.Message}");
+                Debug.WriteLine($"PrinciPal: Error reading breakpoints: {ex.Message}");
             }
 
             return state;
@@ -320,7 +320,7 @@ namespace VsDebugBridge.VsExtension
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"VsDebugBridge: Error reading expression at index {i}: {ex.Message}");
+                    Debug.WriteLine($"PrinciPal: Error reading expression at index {i}: {ex.Message}");
                 }
             }
 

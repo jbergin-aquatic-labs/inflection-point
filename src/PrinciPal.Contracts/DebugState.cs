@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace VsDebugBridge.Contracts
+namespace PrinciPal.Contracts
 {
     /// <summary>
     /// The main container for all debug state read from Visual Studio.

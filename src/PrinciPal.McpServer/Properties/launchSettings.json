@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "VsDebugBridge.McpServer": {
+    "PrinciPal.McpServer": {
       "commandName": "Project",
       "applicationUrl": "http://localhost:9229",
       "environmentVariables": {

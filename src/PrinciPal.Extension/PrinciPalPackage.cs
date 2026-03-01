@@ -5,12 +5,12 @@ using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Task = System.Threading.Tasks.Task;
 
-namespace VsDebugBridge.VsExtension
+namespace PrinciPal.Extension
 {
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExistsAndFullyLoaded_string, PackageAutoLoadFlags.BackgroundLoad)]
-    public sealed class VsDebugBridgePackage : AsyncPackage
+    public sealed class PrinciPalPackage : AsyncPackage
     {
         public const string PackageGuidString = "28d14e0c-5a8f-4b7f-9c12-3e8a6b5d4c9f";
 
@@ -29,7 +29,7 @@ namespace VsDebugBridge.VsExtension
             _debuggerEventHandler = new DebuggerEventHandler(dte, this);
             _debuggerEventHandler.Initialize();
 
-            System.Diagnostics.Debug.WriteLine("VsDebugBridge: Package initialized successfully.");
+            System.Diagnostics.Debug.WriteLine("PrinciPal: Package initialized successfully.");
         }
 
         protected override void Dispose(bool disposing)

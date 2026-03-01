@@ -1,4 +1,4 @@
-namespace VsDebugBridge.Contracts
+namespace PrinciPal.Contracts
 {
     /// <summary>
     /// Represents a breakpoint set in the Visual Studio debugger.

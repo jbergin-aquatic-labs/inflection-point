@@ -1,10 +1,10 @@
 ---
 name: start-mcp
-description: Start the VsDebugBridge MCP server in the background
+description: Start the princiPal MCP server in the background
 allowed-tools: Bash
 ---
 
-Start the VsDebugBridge MCP server as a background process.
+Start the princiPal MCP server as a background process.
 
 ## Steps
 
@@ -16,7 +16,7 @@ Start the VsDebugBridge MCP server as a background process.
 
 2. If not running, start it in the background:
    ```
-   Start-Process -NoNewWindow -FilePath "dotnet" -ArgumentList "run --project C:/Repos/VsDebugBridge/src/VsDebugBridge.McpServer/VsDebugBridge.McpServer.csproj" -PassThru
+   Start-Process -NoNewWindow -FilePath "dotnet" -ArgumentList "run --project C:/Repos/VsDebugBridge/src/PrinciPal.McpServer/PrinciPal.McpServer.csproj" -PassThru
    ```
    This returns the PID.
 

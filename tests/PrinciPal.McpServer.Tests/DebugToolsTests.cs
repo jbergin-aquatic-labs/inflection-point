@@ -1,9 +1,9 @@
 using ModelContextProtocol;
-using VsDebugBridge.Contracts;
-using VsDebugBridge.McpServer.Services;
-using VsDebugBridge.McpServer.Tools;
+using PrinciPal.Contracts;
+using PrinciPal.McpServer.Services;
+using PrinciPal.McpServer.Tools;
 
-namespace VsDebugBridge.McpServer.Tests;
+namespace PrinciPal.McpServer.Tests;
 
 public class DebugToolsTests
 {

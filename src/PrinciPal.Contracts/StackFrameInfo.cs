@@ -1,4 +1,4 @@
-namespace VsDebugBridge.Contracts
+namespace PrinciPal.Contracts
 {
     /// <summary>
     /// Represents a single frame in the debugger call stack.

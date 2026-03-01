@@ -1,7 +1,7 @@
-using VsDebugBridge.Contracts;
-using VsDebugBridge.McpServer.Services;
+using PrinciPal.Contracts;
+using PrinciPal.McpServer.Services;
 
-namespace VsDebugBridge.McpServer.Tests;
+namespace PrinciPal.McpServer.Tests;
 
 public class DebugStateStoreTests
 {

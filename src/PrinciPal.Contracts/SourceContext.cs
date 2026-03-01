@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace VsDebugBridge.Contracts
+namespace PrinciPal.Contracts
 {
     /// <summary>
     /// Source code context around the current breakpoint location.

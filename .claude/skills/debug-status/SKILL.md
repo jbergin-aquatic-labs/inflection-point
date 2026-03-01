@@ -4,7 +4,7 @@ description: Check if the MCP server is running and if debug state is available
 allowed-tools: Bash
 ---
 
-Check the status of VsDebugBridge.
+Check the status of princiPal.
 
 ## Steps
 

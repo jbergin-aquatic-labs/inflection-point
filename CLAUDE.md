@@ -1,4 +1,4 @@
-# VsDebugBridge
+# princiPal
 
 MCP server + VSIX extension that bridges VS 2022 debugger state to AI editors.
 
@@ -21,10 +21,10 @@ netstat -ano | findstr :9229
 taskkill /PID <pid> /F
 
 # Start server manually (foreground)
-dotnet run --project src/VsDebugBridge.McpServer/VsDebugBridge.McpServer.csproj
+dotnet run --project src/PrinciPal.McpServer/PrinciPal.McpServer.csproj
 
 # Start server (background, returns PID)
-Start-Process -NoNewWindow -FilePath "dotnet" -ArgumentList "run --project src/VsDebugBridge.McpServer/VsDebugBridge.McpServer.csproj" -PassThru
+Start-Process -NoNewWindow -FilePath "dotnet" -ArgumentList "run --project src/PrinciPal.McpServer/PrinciPal.McpServer.csproj" -PassThru
 ```
 
 ## Build & Test
@@ -40,7 +40,7 @@ dotnet build -c Release         # Release build
 ```json
 {
   "mcpServers": {
-    "vs-debug-bridge": {
+    "princiPal": {
       "url": "http://localhost:9229/"
     }
   }

@@ -1,11 +1,11 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/VsDebugBridge.Contracts/VsDebugBridge.Contracts.csproj" />
-    <Project Path="src/VsDebugBridge.McpServer/VsDebugBridge.McpServer.csproj" />
-    <Project Path="src/VsDebugBridge.VsExtension/VsDebugBridge.VsExtension.csproj" />
+    <Project Path="src/PrinciPal.Contracts/PrinciPal.Contracts.csproj" />
+    <Project Path="src/PrinciPal.McpServer/PrinciPal.McpServer.csproj" />
+    <Project Path="src/PrinciPal.Extension/PrinciPal.Extension.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/VsDebugBridge.McpServer.Tests/VsDebugBridge.McpServer.Tests.csproj" />
+    <Project Path="tests/PrinciPal.McpServer.Tests/PrinciPal.McpServer.Tests.csproj" />
   </Folder>
   <Folder Name="/.claude/">
     <File Path="CLAUDE.md" />

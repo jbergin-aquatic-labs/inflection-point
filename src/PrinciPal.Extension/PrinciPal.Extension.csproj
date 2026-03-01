@@ -5,8 +5,8 @@
 
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
-    <RootNamespace>VsDebugBridge.VsExtension</RootNamespace>
-    <AssemblyName>VsDebugBridge.VsExtension</AssemblyName>
+    <RootNamespace>PrinciPal.Extension</RootNamespace>
+    <AssemblyName>PrinciPal.Extension</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
 
@@ -43,7 +43,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\VsDebugBridge.Contracts\VsDebugBridge.Contracts.csproj" />
+    <ProjectReference Include="..\PrinciPal.Contracts\PrinciPal.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

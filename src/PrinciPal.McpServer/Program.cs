@@ -1,4 +1,4 @@
-using VsDebugBridge.McpServer.Services;
+using PrinciPal.McpServer.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,7 +8,7 @@ builder.Services.AddMcpServer(options =>
 {
     options.ServerInfo = new()
     {
-        Name = "vs-debug-bridge",
+        Name = "princiPal",
         Version = "1.0.0",
     };
 })
@@ -18,13 +18,13 @@ builder.Services.AddMcpServer(options =>
 var app = builder.Build();
 
 // REST endpoints for the VSIX extension to push debug state
-app.MapPost("/api/debug-state", (DebugStateStore store, VsDebugBridge.Contracts.DebugState state) =>
+app.MapPost("/api/debug-state", (DebugStateStore store, PrinciPal.Contracts.DebugState state) =>
 {
     store.Update(state);
     return Results.Ok();
 });
 
-app.MapPost("/api/debug-state/expression", (DebugStateStore store, VsDebugBridge.Contracts.ExpressionResult result) =>
+app.MapPost("/api/debug-state/expression", (DebugStateStore store, PrinciPal.Contracts.ExpressionResult result) =>
 {
     store.UpdateExpression(result);
     return Results.Ok();

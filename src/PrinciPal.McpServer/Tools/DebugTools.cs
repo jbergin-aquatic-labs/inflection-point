@@ -2,10 +2,10 @@ using System.ComponentModel;
 using System.Text;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
-using VsDebugBridge.Contracts;
-using VsDebugBridge.McpServer.Services;
+using PrinciPal.Contracts;
+using PrinciPal.McpServer.Services;
 
-namespace VsDebugBridge.McpServer.Tools;
+namespace PrinciPal.McpServer.Tools;
 
 /// <summary>
 /// MCP tools that expose the cached Visual Studio debug state to AI clients
@@ -28,7 +28,7 @@ public class DebugTools
     {
         var state = _store.GetCurrentState();
         if (state is null)
-            throw new McpException("No debug state available. Make sure Visual Studio is stopped at a breakpoint and the VsDebugBridge extension is running.");
+            throw new McpException("No debug state available. Make sure Visual Studio is stopped at a breakpoint and the PrinciPal extension is running.");
 
         if (!state.IsInBreakMode)
             throw new McpException("Visual Studio is not in break mode. Hit a breakpoint first.");

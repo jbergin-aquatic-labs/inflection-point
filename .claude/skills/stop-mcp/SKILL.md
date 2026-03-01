@@ -1,10 +1,10 @@
 ---
 name: stop-mcp
-description: Stop the VsDebugBridge MCP server
+description: Stop the princiPal MCP server
 allowed-tools: Bash
 ---
 
-Stop the VsDebugBridge MCP server.
+Stop the princiPal MCP server.
 
 ## Steps
 

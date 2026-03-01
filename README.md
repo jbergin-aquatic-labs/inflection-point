@@ -1,10 +1,10 @@
-# VsDebugBridge
+# princiPal
 
 Bridge Visual Studio debugger state to AI-powered editors (Claude Code, Cursor) via the Model Context Protocol (MCP).
 
 ## What It Does
 
-When you're debugging in Visual Studio and hit a breakpoint, VsDebugBridge automatically captures the debug state (local variables, call stack, source context, breakpoints) and makes it available as MCP tools. Your agentic editor can then query this state to help you understand what's happening in your code.
+When you're debugging in Visual Studio and hit a breakpoint, princiPal automatically captures the debug state (local variables, call stack, source context, breakpoints) and makes it available as MCP tools. Your agentic editor can then query this state to help you understand what's happening in your code.
 
 ```
 VS Debugger ──(auto push)──▶ MCP Server ──(MCP tools)──▶ Claude Code / Cursor
@@ -16,7 +16,7 @@ Two components work together:
 
 | Component | Runtime | Role |
 |---|---|---|
-| **VsExtension** (VSIX) | .NET Framework 4.8 | Reads debugger state via EnvDTE, pushes to MCP server on breakpoint |
+| **Extension** (VSIX) | .NET Framework 4.8 | Reads debugger state via EnvDTE, pushes to MCP server on breakpoint |
 | **McpServer** | .NET 10 (ASP.NET Core) | Receives state, exposes MCP tools for AI editors |
 
 ## MCP Tools
@@ -36,7 +36,7 @@ Two components work together:
 ### 1. Start the MCP Server
 
 ```bash
-cd src/VsDebugBridge.McpServer
+cd src/PrinciPal.McpServer
 dotnet run
 ```
 
@@ -48,7 +48,7 @@ The server starts on `http://localhost:9229`.
 ```json
 {
   "mcpServers": {
-    "vs-debug-bridge": {
+    "princiPal": {
       "url": "http://localhost:9229/sse"
     }
   }
@@ -59,7 +59,7 @@ The server starts on `http://localhost:9229`.
 ```json
 {
   "mcpServers": {
-    "vs-debug-bridge": {
+    "princiPal": {
       "url": "http://localhost:9229/sse"
     }
   }
@@ -71,7 +71,7 @@ The server starts on `http://localhost:9229`.
 Build and install the VSIX:
 ```bash
 # Build the VSIX project
-cd src/VsDebugBridge.VsExtension
+cd src/PrinciPal.Extension
 dotnet build
 
 # Install the .vsix file from the output directory into VS 2022
@@ -98,13 +98,13 @@ dotnet test          # Run tests (39 tests)
 ## Project Structure
 
 ```
-VsDebugBridge/
+princiPal/
   src/
-    VsDebugBridge.Contracts/      # Shared DTOs (netstandard2.0)
-    VsDebugBridge.McpServer/      # MCP server (ASP.NET Core)
-    VsDebugBridge.VsExtension/    # VS 2022 extension (VSIX)
+    PrinciPal.Contracts/      # Shared DTOs (netstandard2.0)
+    PrinciPal.McpServer/      # MCP server (ASP.NET Core)
+    PrinciPal.Extension/      # VS 2022 extension (VSIX)
   tests/
-    VsDebugBridge.McpServer.Tests/  # Unit + integration tests
+    PrinciPal.McpServer.Tests/  # Unit + integration tests
 ```
 
 ## Testing Plan

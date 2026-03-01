@@ -1,6 +1,6 @@
-using VsDebugBridge.Contracts;
+using PrinciPal.Contracts;
 
-namespace VsDebugBridge.McpServer.Services;
+namespace PrinciPal.McpServer.Services;
 
 /// <summary>
 /// Thread-safe in-memory store for the latest debug state pushed from the

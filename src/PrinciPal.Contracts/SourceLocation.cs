@@ -1,4 +1,4 @@
-namespace VsDebugBridge.Contracts
+namespace PrinciPal.Contracts
 {
     /// <summary>
     /// Represents the current source location where the debugger is paused.

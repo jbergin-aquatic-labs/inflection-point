@@ -1,16 +1,16 @@
 using System.Collections.Generic;
 
-namespace VsDebugBridge.Contracts
+namespace PrinciPal.Contracts
 {
     /// <summary>
-    /// Result of evaluating an expression in the debugger.
+    /// Represents a local variable in the current debug scope, including nested members.
     /// </summary>
-    public class ExpressionResult
+    public class LocalVariable
     {
-        public string Expression { get; set; }
+        public string Name { get; set; }
         public string Value { get; set; }
         public string Type { get; set; }
-        public bool IsValid { get; set; }
+        public bool IsValidValue { get; set; }
         public List<LocalVariable> Members { get; set; } = new List<LocalVariable>();
     }
 }
