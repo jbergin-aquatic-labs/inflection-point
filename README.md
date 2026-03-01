@@ -114,12 +114,13 @@ The AI calls MCP tools behind the scenes to read your locals, call stack, and so
 
 ```
 src/
-  PrinciPal.Domain/          # Value objects: DebugState, LocalVariable, StackFrameInfo, etc.
-  PrinciPal.Common/          # Result<T>/Option<T> monads, typed errors
-  PrinciPal.Application/     # IDebugQueryService, ISessionManager, CompactFormatter
-  PrinciPal.Infrastructure/  # SessionManager, DebugQueryService, ThreadSafeDebugStateStore
-  PrinciPal.Server/          # ASP.NET Core host, MCP tool definitions, Quartz idle watchdog
-  PrinciPal.VsExtension/     # VSIX package, COM adapters, HTTP publisher, server process manager
+  PrinciPal.Domain/            # Value objects: DebugState, LocalVariable, StackFrameInfo, etc.
+  PrinciPal.Common/            # Result<T>/Option<T> monads, typed errors
+  PrinciPal.Application/       # IDebugQueryService, ISessionManager, CompactFormatter
+  PrinciPal.Infrastructure/    # SessionManager, DebugQueryService, ThreadSafeDebugStateStore
+  PrinciPal.Server/            # ASP.NET Core host, MCP tool definitions, Quartz idle watchdog
+  PrinciPal.VsExtension/       # VS 2022 VSIX — COM/DTE adapters, HTTP publisher
+  PrinciPal.VsCodeExtension/   # VS Code/Cursor — TypeScript, DAP-based, same HTTP API
 ```
 
 ### Key Design Decisions
@@ -135,9 +136,37 @@ src/
 ## Building & Testing
 
 ```bash
-dotnet build          # Build all projects
-dotnet test           # Run all tests
-dotnet build -c Release   # Release build (bundles server into VSIX)
+dotnet build                # Build all projects (including npm install + tsc for VS Code extension)
+dotnet test                 # Run .NET tests
+dotnet build -c Release     # Release build (bundles server into both VSIX packages)
+```
+
+### Local Development
+
+**Debug mode** — extensions use `dotnet run` against the sibling `PrinciPal.Server` project via a `.devproject` marker file. No bundled exe needed.
+
+**Release mode** — both extension csproj files `dotnet publish` the server as a self-contained exe and package it into their respective VSIX outputs.
+
+#### VS 2022 Extension
+
+In Visual Studio, multi-start the **Server** + **VsExtension** projects in Debug. The extension launches the VS Experimental Instance with the VSIX loaded.
+
+#### VS Code / Cursor Extension
+
+```bash
+cd src/PrinciPal.VsCodeExtension
+npm install && npm run compile    # or: dotnet build
+```
+
+Open the `src/PrinciPal.VsCodeExtension` folder in VS Code and press **F5** → launches an Extension Development Host with the extension loaded. Start any debug session in that window to trigger the extension.
+
+Both extensions share port 9229 and coordinate via a lock file — whichever starts first launches the server, the other reuses it.
+
+#### Running TS Tests
+
+```bash
+cd tests/unit/PrinciPal.VsCodeExtension.Tests
+npm ci && npm test    # 26 Jest tests
 ```
 
 ## License
