@@ -33,3 +33,10 @@ bld/
 
 ## Test Results
 TestResults/
+
+## Node / TypeScript (VS Code extension)
+node_modules/
+out/
+*.tsbuildinfo
+package-lock.json
+src/PrinciPal.VsCodeExtension/Server/

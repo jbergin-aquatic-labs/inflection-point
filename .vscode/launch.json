@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Extension (Dev Host)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/src/PrinciPal.VsCodeExtension"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/src/PrinciPal.VsCodeExtension/out/**/*.js"
+      ]
+    },
+    {
+      "name": "Extension Tests",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/src/PrinciPal.VsCodeExtension",
+        "--extensionTestsPath=${workspaceFolder}/src/PrinciPal.VsCodeExtension/out/test/suite/index"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/src/PrinciPal.VsCodeExtension/out/**/*.js"
+      ]
+    }
+  ]
+}

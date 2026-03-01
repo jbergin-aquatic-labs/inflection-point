@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.Build.NoTargets/3.7.56">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <Target Name="NpmInstall" BeforeTargets="Build">
+    <Exec Command="npm install" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+  <Target Name="NpmTest" AfterTargets="NpmInstall">
+    <Exec Command="npm test" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+</Project>
