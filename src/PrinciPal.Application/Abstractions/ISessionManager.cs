@@ -1,7 +1,7 @@
 using PrinciPal.Domain.Entities;
 using PrinciPal.Domain.ValueObjects;
 
-namespace PrinciPal.Application.Interfaces;
+namespace PrinciPal.Application.Abstractions;
 
 public interface ISessionManager
 {

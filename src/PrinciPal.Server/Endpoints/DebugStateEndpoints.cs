@@ -1,4 +1,4 @@
-using PrinciPal.Application.Interfaces;
+using PrinciPal.Application.Abstractions;
 using PrinciPal.Domain.ValueObjects;
 
 namespace PrinciPal.Server.Endpoints;

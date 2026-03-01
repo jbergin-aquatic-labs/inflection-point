@@ -236,10 +236,6 @@ public static class CompactFormatter
             || module.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase);
     }
 
-    // ------------------------------------------------------------------
-    // Private helpers
-    // ------------------------------------------------------------------
-
     private static Dictionary<string, LocalVariable> BuildVariableMap(List<LocalVariable> vars)
     {
         var map = new Dictionary<string, LocalVariable>();

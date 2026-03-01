@@ -1,4 +1,4 @@
-using PrinciPal.Application.Interfaces;
+using PrinciPal.Application.Abstractions;
 
 namespace PrinciPal.Server.Endpoints;
 

@@ -1,6 +1,6 @@
 using ModelContextProtocol;
 using NSubstitute;
-using PrinciPal.Application.Interfaces;
+using PrinciPal.Application.Abstractions;
 using PrinciPal.Server.Tools;
 
 namespace PrinciPal.Server.Tests.Tools;

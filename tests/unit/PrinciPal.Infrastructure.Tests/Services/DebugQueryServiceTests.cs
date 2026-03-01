@@ -1,9 +1,8 @@
-using PrinciPal.Application.Services;
 using PrinciPal.Domain.Entities;
 using PrinciPal.Domain.ValueObjects;
-using PrinciPal.Server.Infrastructure;
+using PrinciPal.Infrastructure.Services;
 
-namespace PrinciPal.Application.Tests.Services;
+namespace PrinciPal.Infrastructure.Tests.Services;
 
 public class DebugQueryServiceTests
 {

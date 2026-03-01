@@ -1,4 +1,4 @@
-namespace PrinciPal.Application.Interfaces;
+namespace PrinciPal.Application.Abstractions;
 
 public interface ISourceFileReader
 {

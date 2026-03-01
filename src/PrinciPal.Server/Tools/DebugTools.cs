@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
-using PrinciPal.Application.Interfaces;
+using PrinciPal.Application.Abstractions;
 
 namespace PrinciPal.Server.Tools;
 

@@ -11,8 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PrinciPal.Application\PrinciPal.Application.csproj" />
-    <ProjectReference Include="..\PrinciPal.Domain\PrinciPal.Domain.csproj" />
+    <ProjectReference Include="..\PrinciPal.Infrastructure\PrinciPal.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

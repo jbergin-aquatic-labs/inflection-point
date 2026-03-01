@@ -1,7 +1,6 @@
 using System.Reflection;
-using PrinciPal.Application.Interfaces;
-using PrinciPal.Application.Services;
-using PrinciPal.Server.Infrastructure;
+using PrinciPal.Application.Abstractions;
+using PrinciPal.Infrastructure.Services;
 
 namespace PrinciPal.Server.Extensions;
 

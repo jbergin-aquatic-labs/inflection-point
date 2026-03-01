@@ -1,6 +1,6 @@
-using PrinciPal.Application.Interfaces;
+using PrinciPal.Application.Abstractions;
 
-namespace PrinciPal.Server.Infrastructure;
+namespace PrinciPal.Infrastructure.Services;
 
 public class SourceFileReader : ISourceFileReader
 {

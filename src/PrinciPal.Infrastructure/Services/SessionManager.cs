@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
-using PrinciPal.Application.Interfaces;
+using PrinciPal.Application.Abstractions;
 using PrinciPal.Domain.Entities;
 using PrinciPal.Domain.ValueObjects;
 
-namespace PrinciPal.Server.Infrastructure;
+namespace PrinciPal.Infrastructure.Services;
 
 /// <summary>
 /// Manages multiple VS debug sessions. Each session is keyed by a unique ID

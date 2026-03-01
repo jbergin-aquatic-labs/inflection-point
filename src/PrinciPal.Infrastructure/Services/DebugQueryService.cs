@@ -1,10 +1,10 @@
 using System.Text;
+using PrinciPal.Application.Abstractions;
 using PrinciPal.Application.Formatting;
-using PrinciPal.Application.Interfaces;
 using PrinciPal.Domain.Entities;
 using PrinciPal.Domain.ValueObjects;
 
-namespace PrinciPal.Application.Services;
+namespace PrinciPal.Infrastructure.Services;
 
 public class DebugQueryService : IDebugQueryService
 {
