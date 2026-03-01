@@ -27,11 +27,15 @@ namespace PrinciPal.Extension
         private DebuggerEvents? _debuggerEvents;
 
         private readonly string _serverUrl;
+        private readonly string _sessionId;
+        private readonly string _sessionQueryParams;
 
-        public DebuggerEventHandler(DTE2 dte, AsyncPackage package, int port)
+        public DebuggerEventHandler(DTE2 dte, AsyncPackage package, int port, string sessionId, string sessionName, string solutionPath)
         {
             _dte = dte;
             _package = package;
+            _sessionId = sessionId;
+            _sessionQueryParams = $"name={Uri.EscapeDataString(sessionName)}&path={Uri.EscapeDataString(solutionPath)}";
             _serverUrl = $"http://localhost:{port}";
             _httpClient = new HttpClient
             {
@@ -84,7 +88,7 @@ namespace PrinciPal.Extension
                 {
                     try
                     {
-                        var response = await _httpClient.DeleteAsync("/api/debug-state");
+                        var response = await _httpClient.DeleteAsync($"/api/sessions/{Uri.EscapeDataString(_sessionId)}/debug-state");
                         Debug.WriteLine($"PrinciPal: Cleared debug state. Status: {response.StatusCode}");
                     }
                     catch (HttpRequestException ex)
@@ -163,7 +167,7 @@ namespace PrinciPal.Extension
 
                     try
                     {
-                        var response = await _httpClient.PostAsync("/api/debug-state", content);
+                        var response = await _httpClient.PostAsync($"/api/sessions/{Uri.EscapeDataString(_sessionId)}/debug-state?{_sessionQueryParams}", content);
                         Debug.WriteLine($"PrinciPal: Pushed debug state. Status: {response.StatusCode}");
                     }
                     catch (HttpRequestException ex)
@@ -326,6 +330,32 @@ namespace PrinciPal.Extension
             }
 
             return variables;
+        }
+
+        /// <summary>
+        /// Deregisters this session from the MCP server. Best-effort, catches all exceptions.
+        /// </summary>
+        public async Task DeregisterSessionAsync()
+        {
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    try
+                    {
+                        var response = await _httpClient.DeleteAsync($"/api/sessions/{Uri.EscapeDataString(_sessionId)}");
+                        Debug.WriteLine($"PrinciPal: Deregistered session '{_sessionId}'. Status: {response.StatusCode}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"PrinciPal: Failed to deregister session '{_sessionId}': {ex.Message}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"PrinciPal: Error deregistering session: {ex.Message}");
+            }
         }
 
         public void Dispose()

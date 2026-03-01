@@ -1,5 +1,9 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
@@ -38,24 +42,40 @@ namespace PrinciPal.Extension
 
             // Read options
             var options = (PrinciPalOptionsPage)GetDialogPage(typeof(PrinciPalOptionsPage));
-            var configuredPort = options.Port;
+            var port = options.Port;
             var autoStart = options.AutoStart;
 
-            int port = configuredPort;
+            // Compute session ID (unique hash) and friendly name from solution path
+            var solutionPath = dte.Solution?.FullName;
+            string sessionId;
+            string sessionName;
+            if (!string.IsNullOrEmpty(solutionPath))
+            {
+                sessionName = Path.GetFileNameWithoutExtension(solutionPath);
+                var bytes = Encoding.UTF8.GetBytes(solutionPath!.ToLowerInvariant());
+                byte[] hash;
+                using (var sha = new SHA256Managed())
+                {
+                    hash = sha.ComputeHash(bytes);
+                }
+                sessionId = BitConverter.ToString(hash, 0, 4).Replace("-", "").ToLowerInvariant();
+            }
+            else
+            {
+                sessionId = $"vs-{Process.GetCurrentProcess().Id}";
+                sessionName = sessionId;
+            }
 
             if (autoStart)
             {
-                if (McpServerProcessManager.IsPortListening(configuredPort))
+                if (McpServerProcessManager.IsPrinciPalServerRunning(port))
                 {
-                    // Server already running (multi-project startup, or manual)
-                    port = configuredPort;
-                    _logger.Log($"Existing server detected on port {port}. Skipping auto-start.");
+                    _logger.Log($"Existing princiPal server detected on port {port}. Reusing it.");
                 }
                 else
                 {
-                    // No server running — start one ourselves
                     _processManager = new McpServerProcessManager(_logger.Log);
-                    _processManager.Start(configuredPort);
+                    _processManager.Start(port);
                 }
 
                 var mcpUrl = $"http://localhost:{port}/";
@@ -67,9 +87,10 @@ namespace PrinciPal.Extension
                 _logger.Log($"Auto-start disabled. Start the MCP server manually on port {port}.");
             }
 
-            _debuggerEventHandler = new DebuggerEventHandler(dte, this, port);
+            _debuggerEventHandler = new DebuggerEventHandler(dte, this, port, sessionId, sessionName, solutionPath ?? "");
             _debuggerEventHandler.Initialize();
 
+            _logger.Log($"Session: {sessionName} [{sessionId}]");
             _logger.Log("Package initialized.");
         }
 
@@ -78,6 +99,16 @@ namespace PrinciPal.Extension
             ThreadHelper.ThrowIfNotOnUIThread();
             if (disposing)
             {
+                // Best-effort deregister session from MCP server
+                if (_debuggerEventHandler != null)
+                {
+                    try
+                    {
+                        _debuggerEventHandler.DeregisterSessionAsync().Wait(3000);
+                    }
+                    catch { /* best-effort */ }
+                }
+
                 _debuggerEventHandler?.Dispose();
                 _processManager?.Dispose();
             }

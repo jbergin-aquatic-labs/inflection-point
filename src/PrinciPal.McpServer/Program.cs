@@ -1,46 +1,17 @@
-using System.Diagnostics;
 using PrinciPal.McpServer.Services;
 
 // Parse CLI args
 var port = 9229;
-var parentPid = 0;
 
 for (int i = 0; i < args.Length - 1; i++)
 {
     if (args[i] == "--port" && int.TryParse(args[i + 1], out var p))
         port = p;
-    else if (args[i] == "--parent-pid" && int.TryParse(args[i + 1], out var pid))
-        parentPid = pid;
-}
-
-// Parent-pid watchdog: exit if the parent process (e.g. VS) dies
-if (parentPid > 0)
-{
-    var watchdogThread = new Thread(() =>
-    {
-        while (true)
-        {
-            Thread.Sleep(5000);
-            try
-            {
-                Process.GetProcessById(parentPid);
-            }
-            catch
-            {
-                Environment.Exit(0);
-            }
-        }
-    })
-    {
-        IsBackground = true,
-        Name = "ParentPidWatchdog"
-    };
-    watchdogThread.Start();
 }
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSingleton<DebugStateStore>();
+builder.Services.AddSingleton<SessionManager>();
 
 builder.Services.AddMcpServer(options =>
 {
@@ -55,33 +26,74 @@ builder.Services.AddMcpServer(options =>
 
 var app = builder.Build();
 
-// REST endpoints for the VSIX extension to push debug state
-app.MapPost("/api/debug-state", (DebugStateStore store, PrinciPal.Contracts.DebugState state) =>
+// Idle-shutdown watchdog: exit when all sessions disconnect (after initial connection)
+var sessionManager = app.Services.GetRequiredService<SessionManager>();
+var idleShutdownThread = new Thread(() =>
 {
+    // Wait for at least one session to connect
+    while (sessionManager.SessionCount == 0)
+        Thread.Sleep(5000);
+
+    // Poll: if no sessions remain, wait grace period then exit
+    while (true)
+    {
+        Thread.Sleep(10_000);
+        if (sessionManager.SessionCount == 0)
+        {
+            // Grace period: wait 30s before exiting
+            Thread.Sleep(30_000);
+            if (sessionManager.SessionCount == 0)
+                Environment.Exit(0);
+        }
+    }
+})
+{
+    IsBackground = true,
+    Name = "IdleShutdownWatchdog"
+};
+idleShutdownThread.Start();
+
+// Session management endpoints
+app.MapGet("/api/sessions", (SessionManager mgr) => Results.Ok(mgr.GetAllSessions()));
+
+app.MapDelete("/api/sessions/{sessionId}", (SessionManager mgr, string sessionId) =>
+{
+    mgr.RemoveSession(sessionId);
+    return Results.Ok();
+});
+
+// Session-scoped REST endpoints for the VSIX extension to push debug state
+app.MapPost("/api/sessions/{sessionId}/debug-state", (SessionManager mgr, string sessionId, PrinciPal.Contracts.DebugState state, string? name, string? path) =>
+{
+    var store = mgr.GetOrCreateSession(sessionId, name, path);
     store.Update(state);
     return Results.Ok();
 });
 
-app.MapPost("/api/debug-state/expression", (DebugStateStore store, PrinciPal.Contracts.ExpressionResult result) =>
+app.MapPost("/api/sessions/{sessionId}/debug-state/expression", (SessionManager mgr, string sessionId, PrinciPal.Contracts.ExpressionResult result, string? name, string? path) =>
 {
+    var store = mgr.GetOrCreateSession(sessionId, name, path);
     store.UpdateExpression(result);
     return Results.Ok();
 });
 
-app.MapDelete("/api/debug-state", (DebugStateStore store) =>
+app.MapDelete("/api/sessions/{sessionId}/debug-state", (SessionManager mgr, string sessionId) =>
 {
-    store.Clear();
+    var store = mgr.GetSession(sessionId);
+    store?.Clear();
     return Results.Ok();
 });
 
-app.MapGet("/api/debug-state/history", (DebugStateStore store) =>
+app.MapGet("/api/sessions/{sessionId}/debug-state/history", (SessionManager mgr, string sessionId) =>
 {
-    return Results.Ok(store.GetHistory());
+    var store = mgr.GetSession(sessionId);
+    return Results.Ok(store?.GetHistory() ?? new List<PrinciPal.Contracts.DebugStateSnapshot>());
 });
 
-app.MapDelete("/api/debug-state/history", (DebugStateStore store) =>
+app.MapDelete("/api/sessions/{sessionId}/debug-state/history", (SessionManager mgr, string sessionId) =>
 {
-    store.ClearHistory();
+    var store = mgr.GetSession(sessionId);
+    store?.ClearHistory();
     return Results.Ok();
 });
 

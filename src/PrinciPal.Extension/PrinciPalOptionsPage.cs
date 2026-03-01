@@ -7,7 +7,7 @@ namespace PrinciPal.Extension
     {
         [Category("Server")]
         [DisplayName("Port")]
-        [Description("TCP port for the MCP server (default 9229).")]
+        [Description("Port for the MCP server. All VS instances share this single port. Change here and restart VS if the port is in use.")]
         public int Port { get; set; } = 9229;
 
         [Category("Server")]

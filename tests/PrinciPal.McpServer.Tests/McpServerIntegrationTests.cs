@@ -10,13 +10,15 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
 {
     private readonly HttpClient _client;
 
+    private const string TestSessionId = "a1b2c3d4";
+
     public McpServerIntegrationTests(WebApplicationFactory<Program> factory)
     {
         _client = factory.CreateClient();
     }
 
     // =================================================================
-    // POST /api/debug-state
+    // POST /api/sessions/{sessionId}/debug-state
     // =================================================================
 
     [Fact]
@@ -47,7 +49,7 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
             }
         };
 
-        var response = await _client.PostAsJsonAsync("/api/debug-state", state);
+        var response = await _client.PostAsJsonAsync($"/api/sessions/{TestSessionId}/debug-state", state);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -57,7 +59,7 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
     {
         var state = new DebugState { IsInBreakMode = false };
 
-        var response = await _client.PostAsJsonAsync("/api/debug-state", state);
+        var response = await _client.PostAsJsonAsync($"/api/sessions/{TestSessionId}/debug-state", state);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -77,8 +79,8 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
             CurrentLocation = new SourceLocation { FilePath = "B.cs", Line = 2, FunctionName = "B", ProjectName = "P" }
         };
 
-        var response1 = await _client.PostAsJsonAsync("/api/debug-state", state1);
-        var response2 = await _client.PostAsJsonAsync("/api/debug-state", state2);
+        var response1 = await _client.PostAsJsonAsync($"/api/sessions/{TestSessionId}/debug-state", state1);
+        var response2 = await _client.PostAsJsonAsync($"/api/sessions/{TestSessionId}/debug-state", state2);
 
         Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
         Assert.Equal(HttpStatusCode.OK, response2.StatusCode);
@@ -102,7 +104,7 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
     }
 
     // =================================================================
-    // POST /api/debug-state/expression
+    // POST /api/sessions/{sessionId}/debug-state/expression
     // =================================================================
 
     [Fact]
@@ -117,7 +119,7 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
             Members = new List<LocalVariable>()
         };
 
-        var response = await _client.PostAsJsonAsync("/api/debug-state/expression", expression);
+        var response = await _client.PostAsJsonAsync($"/api/sessions/{TestSessionId}/debug-state/expression", expression);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -138,19 +140,19 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
             }
         };
 
-        var response = await _client.PostAsJsonAsync("/api/debug-state/expression", expression);
+        var response = await _client.PostAsJsonAsync($"/api/sessions/{TestSessionId}/debug-state/expression", expression);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     // =================================================================
-    // GET /api/debug-state/history
+    // GET /api/sessions/{sessionId}/debug-state/history
     // =================================================================
 
     [Fact]
     public async Task GetHistory_ReturnsOk_WithEmptyList_WhenNoState()
     {
-        var response = await _client.GetAsync("/api/debug-state/history");
+        var response = await _client.GetAsync($"/api/sessions/EmptySession/debug-state/history");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
@@ -160,6 +162,7 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
     [Fact]
     public async Task GetHistory_ReturnsSnapshots_AfterBreakModeUpdates()
     {
+        var sessionId = "HistorySession";
         var state = new DebugState
         {
             IsInBreakMode = true,
@@ -172,8 +175,8 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
             }
         };
 
-        await _client.PostAsJsonAsync("/api/debug-state", state);
-        var response = await _client.GetAsync("/api/debug-state/history");
+        await _client.PostAsJsonAsync($"/api/sessions/{sessionId}/debug-state", state);
+        var response = await _client.GetAsync($"/api/sessions/{sessionId}/debug-state/history");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
@@ -183,22 +186,23 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
     }
 
     // =================================================================
-    // DELETE /api/debug-state/history
+    // DELETE /api/sessions/{sessionId}/debug-state/history
     // =================================================================
 
     [Fact]
     public async Task DeleteHistory_ReturnsOk_AndClearsHistory()
     {
-        await _client.PostAsJsonAsync("/api/debug-state", new DebugState
+        var sessionId = "DeleteHistSession";
+        await _client.PostAsJsonAsync($"/api/sessions/{sessionId}/debug-state", new DebugState
         {
             IsInBreakMode = true,
             CurrentLocation = new SourceLocation { FilePath = "A.cs", Line = 1, FunctionName = "A", ProjectName = "P" }
         });
 
-        var deleteResponse = await _client.DeleteAsync("/api/debug-state/history");
+        var deleteResponse = await _client.DeleteAsync($"/api/sessions/{sessionId}/debug-state/history");
         Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
 
-        var historyResponse = await _client.GetAsync("/api/debug-state/history");
+        var historyResponse = await _client.GetAsync($"/api/sessions/{sessionId}/debug-state/history");
         var content = await historyResponse.Content.ReadAsStringAsync();
         Assert.Contains("[]", content);
     }
@@ -214,8 +218,103 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
             IsValid = false
         };
 
-        var response = await _client.PostAsJsonAsync("/api/debug-state/expression", expression);
+        var response = await _client.PostAsJsonAsync($"/api/sessions/{TestSessionId}/debug-state/expression", expression);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // =================================================================
+    // GET /api/sessions + DELETE /api/sessions/{sessionId}
+    // =================================================================
+
+    [Fact]
+    public async Task GetSessions_ReturnsEmptyList_Initially()
+    {
+        // Use a fresh factory to avoid state from other tests
+        var response = await _client.GetAsync("/api/sessions");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // Should be a JSON array
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.StartsWith("[", content);
+    }
+
+    [Fact]
+    public async Task SessionLifecycle_RegisterAndDeregister()
+    {
+        var sessionId = "LifecycleTest";
+
+        // Register session by posting state
+        await _client.PostAsJsonAsync($"/api/sessions/{sessionId}/debug-state", new DebugState { IsInBreakMode = false });
+
+        // Verify session appears in list
+        var listResponse = await _client.GetAsync("/api/sessions");
+        var listContent = await listResponse.Content.ReadAsStringAsync();
+        Assert.Contains(sessionId, listContent);
+
+        // Deregister
+        var deleteResponse = await _client.DeleteAsync($"/api/sessions/{sessionId}");
+        Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+
+        // Verify session is gone
+        var listResponse2 = await _client.GetAsync("/api/sessions");
+        var listContent2 = await listResponse2.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(sessionId, listContent2);
+    }
+
+    [Fact]
+    public async Task PostDebugState_WithNameAndPath_StoresSessionMetadata()
+    {
+        var sessionId = "meta1234";
+        var name = "MyApp";
+        var path = @"C:\Repos\MyApp\MyApp.sln";
+
+        await _client.PostAsJsonAsync(
+            $"/api/sessions/{sessionId}/debug-state?name={Uri.EscapeDataString(name)}&path={Uri.EscapeDataString(path)}",
+            new DebugState { IsInBreakMode = false });
+
+        var listResponse = await _client.GetAsync("/api/sessions");
+        var listContent = await listResponse.Content.ReadAsStringAsync();
+        Assert.Contains(sessionId, listContent);
+        Assert.Contains(name, listContent);
+        Assert.Contains(path.Replace(@"\", @"\\"), listContent); // JSON-escaped backslashes
+
+        // Cleanup
+        await _client.DeleteAsync($"/api/sessions/{sessionId}");
+    }
+
+    [Fact]
+    public async Task MultipleSessions_AreIsolated()
+    {
+        var session1 = "IsoA";
+        var session2 = "IsoB";
+
+        var state1 = new DebugState
+        {
+            IsInBreakMode = true,
+            CurrentLocation = new SourceLocation { FilePath = "A.cs", Line = 1, FunctionName = "FuncA", ProjectName = "ProjA" }
+        };
+        var state2 = new DebugState
+        {
+            IsInBreakMode = true,
+            CurrentLocation = new SourceLocation { FilePath = "B.cs", Line = 2, FunctionName = "FuncB", ProjectName = "ProjB" }
+        };
+
+        await _client.PostAsJsonAsync($"/api/sessions/{session1}/debug-state", state1);
+        await _client.PostAsJsonAsync($"/api/sessions/{session2}/debug-state", state2);
+
+        var hist1 = await _client.GetAsync($"/api/sessions/{session1}/debug-state/history");
+        var content1 = await hist1.Content.ReadAsStringAsync();
+        Assert.Contains("FuncA", content1);
+        Assert.DoesNotContain("FuncB", content1);
+
+        var hist2 = await _client.GetAsync($"/api/sessions/{session2}/debug-state/history");
+        var content2 = await hist2.Content.ReadAsStringAsync();
+        Assert.Contains("FuncB", content2);
+        Assert.DoesNotContain("FuncA", content2);
+
+        // Cleanup
+        await _client.DeleteAsync($"/api/sessions/{session1}");
+        await _client.DeleteAsync($"/api/sessions/{session2}");
     }
 }

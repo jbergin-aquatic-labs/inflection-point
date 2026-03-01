@@ -10,12 +10,16 @@ namespace PrinciPal.McpServer.Tests;
 /// </summary>
 public class TokenBudgetTests
 {
-    private readonly DebugStateStore _store = new();
+    private readonly SessionManager _sessionManager = new();
+    private readonly DebugStateStore _store;
     private readonly DebugTools _tools;
+
+    private const string TestSessionId = "b1c2d3e4";
 
     public TokenBudgetTests()
     {
-        _tools = new DebugTools(_store);
+        _store = _sessionManager.GetOrCreateSession(TestSessionId, "BudgetApp", @"C:\src\BudgetApp.sln");
+        _tools = new DebugTools(_sessionManager);
     }
 
     [Fact]
@@ -26,7 +30,7 @@ public class TokenBudgetTests
             CreateLocals(5),
             CreateFrames(3)));
 
-        var result = _tools.GetSnapshot(0);
+        var result = _tools.GetSnapshot(0, session: TestSessionId);
 
         Assert.True(result.Length <= 400,
             $"SingleSnapshot_FiveLocals_ThreeFrames: {result.Length} chars exceeds 400 budget");
@@ -46,7 +50,7 @@ public class TokenBudgetTests
             _store.Update(CreateState($"Loop.cs", 10 + i, "RunLoop", locals, CreateFrames(2)));
         }
 
-        var result = _tools.ExplainExecutionFlow(detail: "changes", depth: 1);
+        var result = _tools.ExplainExecutionFlow(session: TestSessionId, detail: "changes", depth: 1);
 
         Assert.True(result.Length <= 1800,
             $"TenSnapshots_ChangesMode_OneVarChanges: {result.Length} chars exceeds 1800 budget");
@@ -70,7 +74,7 @@ public class TokenBudgetTests
             _store.Update(CreateState($"Step{i}.cs", 10 + i, $"Step{i}", locals, CreateFrames(8)));
         }
 
-        var result = _tools.ExplainExecutionFlow(detail: "changes", depth: 1);
+        var result = _tools.ExplainExecutionFlow(session: TestSessionId, detail: "changes", depth: 1);
 
         Assert.True(result.Length <= 8000,
             $"TwentySixSnapshots_DeepLocals_ChangesMode: {result.Length} chars exceeds 8000 budget");
@@ -85,7 +89,7 @@ public class TokenBudgetTests
                 CreateLocals(3), CreateFrames(2)));
         }
 
-        var result = _tools.ExplainExecutionFlow(detail: "full", depth: 1);
+        var result = _tools.ExplainExecutionFlow(session: TestSessionId, detail: "full", depth: 1);
 
         Assert.True(result.Length <= 3000,
             $"TenSnapshots_FullMode: {result.Length} chars exceeds 3000 budget");
@@ -104,7 +108,7 @@ public class TokenBudgetTests
             _store.Update(CreateState($"Step{i}.cs", i + 1, $"Step{i}", locals, CreateFrames(3)));
         }
 
-        var result = _tools.ExplainExecutionFlow(detail: "summary", depth: 1);
+        var result = _tools.ExplainExecutionFlow(session: TestSessionId, detail: "summary", depth: 1);
 
         Assert.True(result.Length <= 2500,
             $"TwentySixSnapshots_SummaryMode: {result.Length} chars exceeds 2500 budget");
@@ -116,7 +120,7 @@ public class TokenBudgetTests
         var locals = CreateDeepLocals(8, 5, 0);
         _store.Update(CreateState("Deep.cs", 1, "DeepMethod", locals, new List<StackFrameInfo>()));
 
-        var result = _tools.GetLocals(depth: 0);
+        var result = _tools.GetLocals(session: TestSessionId, depth: 0);
 
         Assert.True(result.Length <= 350,
             $"GetLocals_DepthZero_NoExpansion: {result.Length} chars exceeds 350 budget");
@@ -128,7 +132,7 @@ public class TokenBudgetTests
         var locals = CreateDeepLocals(8, 3, 0);
         _store.Update(CreateState("Deep.cs", 1, "DeepMethod", locals, new List<StackFrameInfo>()));
 
-        var result = _tools.GetLocals(depth: 2);
+        var result = _tools.GetLocals(session: TestSessionId, depth: 2);
 
         Assert.True(result.Length <= 1200,
             $"GetLocals_DepthTwo_TwoLevels: {result.Length} chars exceeds 1200 budget");
@@ -143,7 +147,7 @@ public class TokenBudgetTests
                 CreateLocals(3), CreateFrames(2)));
         }
 
-        var result = _tools.ExplainExecutionFlow(detail: "full", depth: 1, start: 10, count: 3);
+        var result = _tools.ExplainExecutionFlow(session: TestSessionId, detail: "full", depth: 1, start: 10, count: 3);
 
         Assert.True(result.Length <= 1000,
             $"Pagination_ThreeOfTwenty: {result.Length} chars exceeds 1000 budget");

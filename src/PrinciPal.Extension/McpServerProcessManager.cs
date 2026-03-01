@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Net.Sockets;
 using System.Reflection;
 
 namespace PrinciPal.Extension
@@ -43,8 +42,7 @@ namespace PrinciPal.Extension
 
         private void StartProcess()
         {
-            var parentPid = Process.GetCurrentProcess().Id;
-            var startInfo = ResolveStartInfo(parentPid);
+            var startInfo = ResolveStartInfo();
             if (startInfo == null) return;
 
             _process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
@@ -65,12 +63,12 @@ namespace PrinciPal.Extension
             }
         }
 
-        private ProcessStartInfo? ResolveStartInfo(int parentPid)
+        private ProcessStartInfo? ResolveStartInfo()
         {
             var extensionDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             var exePath = Path.Combine(extensionDir, ServerExeRelativePath);
             var devMarkerPath = Path.Combine(extensionDir, DevMarkerRelativePath);
-            var args = $"--port {_port} --parent-pid {parentPid}";
+            var args = $"--port {_port}";
 
             // Release: bundled self-contained exe
             if (File.Exists(exePath))
@@ -137,39 +135,27 @@ namespace PrinciPal.Extension
             }
         }
 
-        public static bool IsPortListening(int port)
+        /// <summary>
+        /// Checks if a princiPal MCP server is already running on the given port
+        /// by hitting the /api/health endpoint. Distinguishes our server from
+        /// unrelated services that happen to be on the same port.
+        /// </summary>
+        public static bool IsPrinciPalServerRunning(int port)
         {
             try
             {
-                using (var client = new TcpClient())
+                var request = WebRequest.CreateHttp($"http://localhost:{port}/api/health");
+                request.Method = "GET";
+                request.Timeout = 2000;
+                using (var response = (HttpWebResponse)request.GetResponse())
                 {
-                    client.Connect(IPAddress.Loopback, port);
-                    return true;
+                    return response.StatusCode == HttpStatusCode.OK;
                 }
             }
-            catch (SocketException)
+            catch
             {
                 return false;
             }
-        }
-
-        public static int FindAvailablePort(int startPort)
-        {
-            for (int port = startPort; port < startPort + 100; port++)
-            {
-                try
-                {
-                    var listener = new TcpListener(IPAddress.Loopback, port);
-                    listener.Start();
-                    listener.Stop();
-                    return port;
-                }
-                catch (SocketException)
-                {
-                    // Port in use, try next
-                }
-            }
-            return startPort; // fallback
         }
 
         public void Dispose()
@@ -181,15 +167,40 @@ namespace PrinciPal.Extension
 
                 if (_process != null && !_process.HasExited)
                 {
+                    // Only kill the server if no other sessions are using it.
+                    // The idle-shutdown watchdog will clean it up if all sessions leave.
+                    var hasOtherSessions = false;
                     try
                     {
-                        _process.Kill();
-                        _process.WaitForExit(5000);
-                        _log("MCP server stopped.");
+                        var request = WebRequest.CreateHttp($"http://localhost:{_port}/api/sessions");
+                        request.Method = "GET";
+                        request.Timeout = 2000;
+                        using (var response = (HttpWebResponse)request.GetResponse())
+                        using (var reader = new System.IO.StreamReader(response.GetResponseStream()))
+                        {
+                            var body = reader.ReadToEnd();
+                            // If there are remaining sessions (array not empty), don't kill
+                            hasOtherSessions = body.Contains("sessionId") || body.Contains("SessionId");
+                        }
                     }
-                    catch (Exception ex)
+                    catch { /* can't reach server, safe to kill */ }
+
+                    if (!hasOtherSessions)
                     {
-                        _log($"Error stopping MCP server: {ex.Message}");
+                        try
+                        {
+                            _process.Kill();
+                            _process.WaitForExit(5000);
+                            _log("MCP server stopped.");
+                        }
+                        catch (Exception ex)
+                        {
+                            _log($"Error stopping MCP server: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        _log("Other sessions still active — leaving MCP server running.");
                     }
                 }
 
