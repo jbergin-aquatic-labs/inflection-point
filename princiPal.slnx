@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/PrinciPal.Common/PrinciPal.Common.csproj" />
     <Project Path="src/PrinciPal.Domain/PrinciPal.Domain.csproj" />
     <Project Path="src/PrinciPal.Application/PrinciPal.Application.csproj" />
     <Project Path="src/PrinciPal.Infrastructure/PrinciPal.Infrastructure.csproj" />
