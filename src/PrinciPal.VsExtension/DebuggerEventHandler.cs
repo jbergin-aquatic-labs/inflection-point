@@ -113,7 +113,7 @@ namespace PrinciPal.VsExtension
 
         public async Task DeregisterSessionAsync()
         {
-            var result = await _coordinator.DeregisterAsync();
+            var result = await _coordinator.DeregisterAsync().ConfigureAwait(false);
             result.Switch(
                 onSuccess: () => Debug.WriteLine($"PrinciPal: Deregistered session."),
                 onFailure: err => Debug.WriteLine($"PrinciPal: Failed to deregister session: {err.Description}"));

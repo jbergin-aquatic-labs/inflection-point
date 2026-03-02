@@ -24,6 +24,7 @@ public class SessionManager : ISessionManager
     /// </summary>
     public IDebugStateStore GetOrCreateSession(string sessionId, string? name = null, string? solutionPath = null)
     {
+        var now = DateTime.UtcNow;
         var entry = _sessions.GetOrAdd(sessionId, id => new SessionEntry
         {
             Store = new ThreadSafeDebugStateStore(),
@@ -32,7 +33,8 @@ public class SessionManager : ISessionManager
                 SessionId = id,
                 Name = name ?? "",
                 SolutionPath = solutionPath ?? "",
-                ConnectedAt = DateTime.UtcNow
+                ConnectedAt = now,
+                LastSeen = now
             }
         });
 
@@ -41,6 +43,9 @@ public class SessionManager : ISessionManager
             entry.Info.Name = name;
         if (!string.IsNullOrEmpty(solutionPath) && string.IsNullOrEmpty(entry.Info.SolutionPath))
             entry.Info.SolutionPath = solutionPath;
+
+        // Always update LastSeen on every call (heartbeat touch)
+        entry.Info.LastSeen = DateTime.UtcNow;
 
         return entry.Store;
     }
@@ -106,10 +111,23 @@ public class SessionManager : ISessionManager
                 Name = info.Name,
                 SolutionPath = info.SolutionPath,
                 ConnectedAt = info.ConnectedAt,
+                LastSeen = info.LastSeen,
                 HasDebugState = state is { IsInBreakMode: true }
             });
         }
         return result;
+    }
+
+    /// <summary>
+    /// Returns session IDs that haven't been seen within the given timeout.
+    /// </summary>
+    public List<string> GetStaleSessions(TimeSpan timeout)
+    {
+        var cutoff = DateTime.UtcNow - timeout;
+        return _sessions
+            .Where(kvp => kvp.Value.Info.LastSeen < cutoff)
+            .Select(kvp => kvp.Key)
+            .ToList();
     }
 
     private class SessionEntry

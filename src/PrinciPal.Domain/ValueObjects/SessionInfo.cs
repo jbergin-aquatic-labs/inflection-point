@@ -8,6 +8,7 @@ namespace PrinciPal.Domain.ValueObjects
         public string Name { get; set; } = "";
         public string SolutionPath { get; set; } = "";
         public DateTime ConnectedAt { get; set; }
+        public DateTime LastSeen { get; set; }
         public bool HasDebugState { get; set; }
     }
 }

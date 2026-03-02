@@ -14,6 +14,7 @@ internal static class ServiceCollectionExtensions
     {
         services.AddCoreServices();
         services.AddIdleShutdownWatchdog(configuration);
+        services.AddSessionReaper(configuration);
         services.AddMcpServer(configuration);
 
         return services;
@@ -46,6 +47,23 @@ internal static class ServiceCollectionExtensions
                     .RepeatForever()));
         });
         services.AddQuartzHostedService();
+    }
+
+    private static void AddSessionReaper(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<SessionReaperOptions>(
+            configuration.GetSection("SessionReaper"));
+
+        services.AddQuartz(q =>
+        {
+            var jobKey = JobKey.Create(nameof(SessionReaperJob));
+            q.AddJob<SessionReaperJob>(jobKey);
+            q.AddTrigger(t => t
+                .ForJob(jobKey)
+                .WithSimpleSchedule(s => s
+                    .WithIntervalInSeconds(30)
+                    .RepeatForever()));
+        });
     }
 
     private static void AddMcpServer(this IServiceCollection services, IConfiguration configuration)

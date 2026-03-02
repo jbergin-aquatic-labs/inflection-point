@@ -11,13 +11,18 @@ function createMockFetch(
     overrides?: Partial<{
         throwError: Error;
         response: Partial<Response>;
+        failCount: number;
     }>
 ): { fetch: FetchFunction; captured: CapturedRequest[] } {
     const captured: CapturedRequest[] = [];
+    let callCount = 0;
 
     const mockFetch: FetchFunction = async (url, init) => {
+        callCount++;
         captured.push({ url, init });
-        if (overrides?.throwError) throw overrides.throwError;
+        if (overrides?.throwError && (overrides.failCount === undefined || callCount <= overrides.failCount)) {
+            throw overrides.throwError;
+        }
         return {
             ok: true,
             status: 200,
@@ -127,11 +132,11 @@ describe("HttpDebugStatePublisher", () => {
 
     describe("error handling", () => {
         it("network error returns ServerUnreachableError", async () => {
-            const { fetch } = createMockFetch({
+            const { fetch, captured } = createMockFetch({
                 throwError: new TypeError("fetch failed: ECONNREFUSED"),
             });
             const publisher = new HttpDebugStatePublisher(
-                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch
+                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch, 5000, 0
             );
 
             const result = await publisher.registerSession();
@@ -141,14 +146,15 @@ describe("HttpDebugStatePublisher", () => {
                 expect(result.error).toBeInstanceOf(ServerUnreachableError);
                 expect(result.error.code).toBe("Server.Unreachable");
             }
+            expect(captured).toHaveLength(3);
         });
 
         it("abort error returns RequestTimedOutError", async () => {
-            const { fetch } = createMockFetch({
+            const { fetch, captured } = createMockFetch({
                 throwError: new DOMException("signal is aborted", "AbortError"),
             });
             const publisher = new HttpDebugStatePublisher(
-                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch
+                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch, 5000, 0
             );
 
             const result = await publisher.registerSession();
@@ -158,6 +164,136 @@ describe("HttpDebugStatePublisher", () => {
                 expect(result.error).toBeInstanceOf(RequestTimedOutError);
                 expect(result.error.code).toBe("Server.Timeout");
             }
+            expect(captured).toHaveLength(3);
+        });
+    });
+
+    describe("heartbeat", () => {
+        beforeEach(() => {
+            jest.useFakeTimers();
+        });
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it("startHeartbeat posts to register URL on tick", () => {
+            const { fetch, captured } = createMockFetch();
+            const publisher = new HttpDebugStatePublisher(
+                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch, 5000, 0, 1000
+            );
+
+            publisher.startHeartbeat();
+            jest.advanceTimersByTime(1000);
+
+            expect(captured).toHaveLength(1);
+            expect(captured[0].url).toContain(`/api/sessions/${SESSION_ID}`);
+            expect(captured[0].init?.method).toBe("POST");
+
+            publisher.dispose();
+        });
+
+        it("stopHeartbeat cancels interval", () => {
+            const { fetch, captured } = createMockFetch();
+            const publisher = new HttpDebugStatePublisher(
+                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch, 5000, 0, 1000
+            );
+
+            publisher.startHeartbeat();
+            jest.advanceTimersByTime(1000);
+            const countAfterOneTick = captured.length;
+
+            publisher.stopHeartbeat();
+            jest.advanceTimersByTime(3000);
+
+            expect(captured).toHaveLength(countAfterOneTick);
+
+            publisher.dispose();
+        });
+
+        it("interval <= 0 never fires", () => {
+            const { fetch, captured } = createMockFetch();
+            const publisher = new HttpDebugStatePublisher(
+                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch, 5000, 0, 0
+            );
+
+            publisher.startHeartbeat();
+            jest.advanceTimersByTime(5000);
+
+            expect(captured).toHaveLength(0);
+
+            publisher.dispose();
+        });
+
+        it("stopHeartbeat is safe to call when never started", () => {
+            const { fetch } = createMockFetch();
+            const publisher = new HttpDebugStatePublisher(
+                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch, 5000, 0, 1000
+            );
+
+            // Should not throw
+            expect(() => publisher.stopHeartbeat()).not.toThrow();
+            publisher.dispose();
+        });
+
+        it("dispose clears heartbeat handle", () => {
+            const { fetch, captured } = createMockFetch();
+            const publisher = new HttpDebugStatePublisher(
+                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch, 5000, 0, 1000
+            );
+
+            publisher.startHeartbeat();
+            publisher.dispose();
+            jest.advanceTimersByTime(3000);
+
+            expect(captured).toHaveLength(0);
+        });
+    });
+
+    describe("retry behavior", () => {
+        it("retries then succeeds on network error", async () => {
+            const { fetch, captured } = createMockFetch({
+                throwError: new TypeError("fetch failed: ECONNREFUSED"),
+                failCount: 2,
+            });
+            const publisher = new HttpDebugStatePublisher(
+                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch, 5000, 0
+            );
+
+            const result = await publisher.registerSession();
+
+            expect(result.ok).toBe(true);
+            expect(captured).toHaveLength(3);
+        });
+
+        it("exhausts retries and returns failure", async () => {
+            const { fetch, captured } = createMockFetch({
+                throwError: new TypeError("fetch failed: ECONNREFUSED"),
+            });
+            const publisher = new HttpDebugStatePublisher(
+                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch, 5000, 0
+            );
+
+            const result = await publisher.registerSession();
+
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.error).toBeInstanceOf(ServerUnreachableError);
+            }
+            expect(captured).toHaveLength(3);
+        });
+
+        it("deregister does not retry", async () => {
+            const { fetch, captured } = createMockFetch({
+                throwError: new TypeError("fetch failed: ECONNREFUSED"),
+            });
+            const publisher = new HttpDebugStatePublisher(
+                PORT, SESSION_ID, SESSION_NAME, WORKSPACE_PATH, fetch, 5000, 0
+            );
+
+            const result = await publisher.deregisterSession();
+
+            expect(result.ok).toBe(false);
+            expect(captured).toHaveLength(1);
         });
     });
 });

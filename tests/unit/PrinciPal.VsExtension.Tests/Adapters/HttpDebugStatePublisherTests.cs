@@ -24,7 +24,7 @@ namespace PrinciPal.VsExtension.Tests.Adapters
         public HttpDebugStatePublisherTests()
         {
             _handler = new StubHandler();
-            _sut = new HttpDebugStatePublisher(Port, SessionId, SessionName, SolutionPath, _handler);
+            _sut = new HttpDebugStatePublisher(Port, SessionId, SessionName, SolutionPath, _handler, retryBaseDelayMs: 0, heartbeatIntervalMs: Timeout.Infinite);
         }
 
         public void Dispose()
@@ -97,6 +97,7 @@ namespace PrinciPal.VsExtension.Tests.Adapters
             Assert.True(result.IsFailure);
             Assert.Equal("Server.Unreachable", result.Error.Code);
             Assert.Contains("Connection refused", result.Error.Description);
+            Assert.Equal(3, _handler.SendCallCount);
         }
 
         [Fact]
@@ -109,6 +110,99 @@ namespace PrinciPal.VsExtension.Tests.Adapters
             Assert.True(result.IsFailure);
             Assert.Equal("Server.Timeout", result.Error.Code);
             Assert.Contains("Register", result.Error.Description);
+            Assert.Equal(3, _handler.SendCallCount);
+        }
+
+        [Fact]
+        public async Task SendAsync_RetriesThenSucceeds()
+        {
+            _handler.ThrowOnSend = new HttpRequestException("Connection refused");
+            _handler.SucceedAfter = 2;
+
+            var result = await _sut.RegisterSessionAsync();
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(3, _handler.SendCallCount);
+        }
+
+        [Fact]
+        public async Task SendAsync_TimeoutRetriesThenSucceeds()
+        {
+            _handler.ThrowOnSend = new TaskCanceledException("Timed out");
+            _handler.SucceedAfter = 1;
+
+            var result = await _sut.RegisterSessionAsync();
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(2, _handler.SendCallCount);
+        }
+
+        [Fact]
+        public async Task DeregisterSessionAsync_DoesNotRetry()
+        {
+            _handler.ThrowOnSend = new HttpRequestException("Connection refused");
+
+            var result = await _sut.DeregisterSessionAsync();
+
+            Assert.True(result.IsFailure);
+            Assert.Equal(1, _handler.SendCallCount);
+        }
+
+        [Fact]
+        public async Task StartHeartbeat_FiresRegisterEndpoint()
+        {
+            var handler = new StubHandler();
+            using var publisher = new HttpDebugStatePublisher(Port, SessionId, SessionName, SolutionPath, handler, retryBaseDelayMs: 0, heartbeatIntervalMs: 50);
+            publisher.StartHeartbeat();
+
+            // Wait long enough for at least one tick
+            await Task.Delay(200);
+            publisher.StopHeartbeat();
+
+            Assert.True(handler.SendCallCount >= 1, $"Expected at least 1 heartbeat call, got {handler.SendCallCount}");
+            Assert.Contains($"/api/sessions/{SessionId}", handler.LastRequest!.RequestUri!.PathAndQuery);
+        }
+
+        [Fact]
+        public async Task StopHeartbeat_StopsTimerFiring()
+        {
+            var handler = new StubHandler();
+            using var publisher = new HttpDebugStatePublisher(Port, SessionId, SessionName, SolutionPath, handler, retryBaseDelayMs: 0, heartbeatIntervalMs: 50);
+            publisher.StartHeartbeat();
+            await Task.Delay(100);
+            publisher.StopHeartbeat();
+
+            var countAfterStop = handler.SendCallCount;
+            await Task.Delay(150);
+
+            Assert.Equal(countAfterStop, handler.SendCallCount);
+        }
+
+        [Fact]
+        public async Task Heartbeat_IntervalLessThanOrEqualZero_NeverFires()
+        {
+            var handler = new StubHandler();
+            using var publisher = new HttpDebugStatePublisher(Port, SessionId, SessionName, SolutionPath, handler, retryBaseDelayMs: 0, heartbeatIntervalMs: 0);
+            publisher.StartHeartbeat();
+
+            await Task.Delay(100);
+            publisher.StopHeartbeat();
+
+            Assert.Equal(0, handler.SendCallCount);
+        }
+
+        [Fact]
+        public async Task Dispose_StopsHeartbeatTimer()
+        {
+            var handler = new StubHandler();
+            var publisher = new HttpDebugStatePublisher(Port, SessionId, SessionName, SolutionPath, handler, retryBaseDelayMs: 0, heartbeatIntervalMs: 50);
+            publisher.StartHeartbeat();
+            publisher.Dispose();
+
+            var countAfterDispose = handler.SendCallCount;
+            await Task.Delay(150);
+
+            Assert.Equal(countAfterDispose, handler.SendCallCount);
         }
 
         /// <summary>
@@ -121,15 +215,18 @@ namespace PrinciPal.VsExtension.Tests.Adapters
             public HttpRequestMessage? LastRequest { get; private set; }
             public string? LastRequestBody { get; private set; }
             public Exception? ThrowOnSend { get; set; }
+            public int SendCallCount { get; private set; }
+            public int? SucceedAfter { get; set; }
 
             protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             {
+                SendCallCount++;
                 LastRequest = request;
                 LastRequestBody = request.Content != null
                     ? await request.Content.ReadAsStringAsync()
                     : null;
 
-                if (ThrowOnSend != null)
+                if (ThrowOnSend != null && (SucceedAfter == null || SendCallCount <= SucceedAfter))
                     throw ThrowOnSend;
 
                 return new HttpResponseMessage(HttpStatusCode.OK);

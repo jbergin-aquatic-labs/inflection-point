@@ -88,6 +88,8 @@ export async function activate(
         logger.log(regResult.error.description);
     }
 
+    publisher.startHeartbeat();
+
     // Cleanup on deactivate — deregister must happen before publisher is disposed.
     context.subscriptions.push({
         dispose() {
@@ -101,6 +103,9 @@ export async function activate(
 }
 
 export async function deactivate(): Promise<void> {
+    // Stop heartbeat before deregister so we don't re-register during teardown.
+    publisher?.stopHeartbeat();
+
     // Best-effort deregistration with bounded wait (matches VS extension's 3s timeout).
     // Must complete before publisher is disposed, since dispose() aborts in-flight requests.
     try {

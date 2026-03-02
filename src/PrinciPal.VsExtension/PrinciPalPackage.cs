@@ -96,6 +96,7 @@ namespace PrinciPal.VsExtension
 
             _debuggerEventHandler = new DebuggerEventHandler(dte, this, coordinator, _logger);
             _debuggerEventHandler.Initialize();
+            _publisher.StartHeartbeat();
 
             _logger.Log($"Session: {sessionName} [{sessionId}]");
             _logger.Log("Package initialized.");
@@ -106,17 +107,29 @@ namespace PrinciPal.VsExtension
             ThreadHelper.ThrowIfNotOnUIThread();
             if (disposing)
             {
-                // Best-effort deregister session from MCP server
+                // Unsubscribe COM events first so no new fire-and-forget tasks can
+                // start while we're waiting on deregister.
+                _debuggerEventHandler?.Dispose();
+
+                // Stop heartbeat before deregister so we don't re-register during teardown.
+                _publisher?.StopHeartbeat();
+
+                // Best-effort deregister session from MCP server.
+                // JoinableTaskFactory.Run pumps the message loop, avoiding the deadlock
+                // that .Wait() causes when async continuations need the UI thread.
                 if (_debuggerEventHandler != null)
                 {
                     try
                     {
-                        _debuggerEventHandler.DeregisterSessionAsync().Wait(3000);
+                        JoinableTaskFactory.Run(async () =>
+                        {
+                            var timeout = Task.Delay(3000);
+                            await Task.WhenAny(_debuggerEventHandler.DeregisterSessionAsync(), timeout);
+                        });
                     }
                     catch { /* best-effort */ }
                 }
 
-                _debuggerEventHandler?.Dispose();
                 _publisher?.Dispose();
                 _processManager?.Dispose();
             }

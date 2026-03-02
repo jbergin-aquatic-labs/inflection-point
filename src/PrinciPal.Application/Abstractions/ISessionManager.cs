@@ -12,4 +12,5 @@ public interface ISessionManager
     Result<IDebugStateStore> ResolveByNameOrId(string query);
     void RemoveSession(string sessionId);
     List<SessionInfo> GetAllSessions();
+    List<string> GetStaleSessions(TimeSpan timeout);
 }
