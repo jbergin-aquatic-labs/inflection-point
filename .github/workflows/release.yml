@@ -79,6 +79,13 @@ jobs:
         with:
           name: princiPal-vscode.vsix
 
+      - name: Rename assets
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          mv PrinciPal.VsExtension.vsix "princiPal-vs-${VERSION}.vsix"
+          mv principal-vscode-*.vsix "princiPal-vscode-${VERSION}.vsix"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
