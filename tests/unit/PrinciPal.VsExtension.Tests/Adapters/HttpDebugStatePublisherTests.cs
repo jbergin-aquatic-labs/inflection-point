@@ -171,6 +171,7 @@ namespace PrinciPal.VsExtension.Tests.Adapters
             publisher.StartHeartbeat();
             await Task.Delay(100);
             publisher.StopHeartbeat();
+            await Task.Delay(50); // let in-flight heartbeat calls drain
 
             var countAfterStop = handler.SendCallCount;
             await Task.Delay(150);
