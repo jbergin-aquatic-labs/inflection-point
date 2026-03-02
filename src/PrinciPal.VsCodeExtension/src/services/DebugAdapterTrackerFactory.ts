@@ -66,7 +66,6 @@ class PrinciPalDebugTracker implements vscode.DebugAdapterTracker {
             void this.buildAndPush();
         } else if (message.event === "continued") {
             this._adapter.clearBreakMode();
-            void this.clear();
         }
     }
 

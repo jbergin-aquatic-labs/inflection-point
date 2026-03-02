@@ -76,8 +76,9 @@ describe("DebugAdapterTrackerFactory", () => {
             expect(coordinator.publishState).toHaveBeenCalled();
         });
 
-        it("continued event triggers clear", async () => {
-            const { factory, coordinator } = createMocks();
+        it("continued event clears break mode but does not clear state", async () => {
+            const { factory, adapter, coordinator } = createMocks();
+            const clearBreakSpy = jest.spyOn(adapter, "clearBreakMode");
             const tracker = factory.createDebugAdapterTracker({} as any) as {
                 onDidSendMessage(msg: any): void;
             };
@@ -89,7 +90,8 @@ describe("DebugAdapterTrackerFactory", () => {
 
             await new Promise((r) => setTimeout(r, 0));
 
-            expect(coordinator.clearState).toHaveBeenCalled();
+            expect(clearBreakSpy).toHaveBeenCalled();
+            expect(coordinator.clearState).not.toHaveBeenCalled();
         });
 
         it("session end triggers clear", async () => {
