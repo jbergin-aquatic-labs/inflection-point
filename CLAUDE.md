@@ -1,48 +1,27 @@
 # princiPal
 
-MCP server + VSIX extension that bridges VS 2022 debugger state to AI editors.
+Bridges VS 2022 / VS Code debugger state to AI editors via MCP.
 
-## Commands
+## Project Structure
 
-| Command | What it does |
-|---|---|
-| `/start-mcp` | Start the MCP server on localhost:9229 (background) |
-| `/stop-mcp` | Kill the MCP server process |
-| `/build-vsix` | Build the VS extension |
-| `/debug-status` | Check if server is running + show PID |
-
-## Process Management
-
-```powershell
-# Find what's on port 9229
-netstat -ano | findstr :9229
-
-# Kill by PID
-taskkill /PID <pid> /F
-
-# Start server manually (foreground)
-dotnet run --project src/PrinciPal.Server/PrinciPal.Server.csproj
-
-# Start server (background, returns PID)
-Start-Process -NoNewWindow -FilePath "dotnet" -ArgumentList "run --project src/PrinciPal.Server/PrinciPal.Server.csproj" -PassThru
+```
+src/
+  PrinciPal.Domain/          # Domain models and interfaces
+  PrinciPal.Application/     # Application logic and services
+  PrinciPal.Infrastructure/  # External concerns (persistence, integrations)
+  PrinciPal.Common/          # Shared utilities
+  PrinciPal.Server/          # ASP.NET host — API + MCP server (localhost:9229)
+  PrinciPal.VsExtension/     # VSIX for Visual Studio 2022
+  PrinciPal.VsCodeExtension/ # VSIX for VS Code / Cursor
+tests/
+  unit/                      # Unit tests mirroring src/ projects
+  integration/               # Integration tests
+  smoke/                     # Smoke tests
 ```
 
 ## Build & Test
 
 ```bash
-dotnet build                    # Build all
-dotnet test                     # Run 39 tests
-dotnet build -c Release         # Release build
-```
-
-## MCP Config (add to ~/.claude.json)
-
-```json
-{
-  "mcpServers": {
-    "princiPal": {
-      "url": "http://localhost:9229/"
-    }
-  }
-}
+dotnet build          # Build all
+dotnet test           # Run all tests
 ```

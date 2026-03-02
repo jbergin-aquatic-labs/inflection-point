@@ -19,14 +19,8 @@
   <Folder Name="/tests/smoke/">
     <Project Path="tests/smoke/PrinciPal.Tests.Smoke/PrinciPal.Tests.Smoke.csproj" />
   </Folder>
+  <Folder Name="/tests/" />
   <Folder Name="/tests/integration/">
     <Project Path="tests/integration/PrinciPal.Integration.Tests/PrinciPal.Integration.Tests.csproj" />
-  </Folder>
-  <Folder Name="/.claude/">
-    <File Path="CLAUDE.md" />
-    <File Path=".claude/skills/start-mcp/SKILL.md" />
-    <File Path=".claude/skills/stop-mcp/SKILL.md" />
-    <File Path=".claude/skills/build-vsix/SKILL.md" />
-    <File Path=".claude/skills/debug-status/SKILL.md" />
   </Folder>
 </Solution>
