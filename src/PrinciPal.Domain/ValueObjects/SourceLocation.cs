@@ -5,10 +5,10 @@ namespace PrinciPal.Domain.ValueObjects
     /// </summary>
     public class SourceLocation
     {
-        public string FilePath { get; set; }
+        public string FilePath { get; set; } = string.Empty;
         public int Line { get; set; }
         public int Column { get; set; }
-        public string FunctionName { get; set; }
-        public string ProjectName { get; set; }
+        public string FunctionName { get; set; } = string.Empty;
+        public string? ProjectName { get; set; }
     }
 }

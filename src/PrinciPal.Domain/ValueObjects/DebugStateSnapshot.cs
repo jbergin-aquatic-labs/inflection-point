@@ -10,6 +10,6 @@ namespace PrinciPal.Domain.ValueObjects
     {
         public int Index { get; set; }
         public DateTime CapturedAt { get; set; }
-        public DebugState State { get; set; }
+        public DebugState State { get; set; } = new DebugState();
     }
 }

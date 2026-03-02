@@ -7,19 +7,9 @@ namespace PrinciPal.Domain.ValueObjects
     /// </summary>
     public class SourceContext
     {
-        public string FilePath { get; set; }
+        public string FilePath { get; set; } = string.Empty;
         public int CurrentLine { get; set; }
-        public string FunctionName { get; set; }
+        public string FunctionName { get; set; } = string.Empty;
         public List<SourceLine> Lines { get; set; } = new List<SourceLine>();
-    }
-
-    /// <summary>
-    /// A single line of source code with metadata.
-    /// </summary>
-    public class SourceLine
-    {
-        public int LineNumber { get; set; }
-        public string Text { get; set; }
-        public bool IsCurrentLine { get; set; }
     }
 }
