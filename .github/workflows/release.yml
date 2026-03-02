@@ -28,12 +28,15 @@ jobs:
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           echo "RESOLVED_VERSION=$VERSION" >> "$GITHUB_ENV"
+          # VS 2022 VSIX manifests require System.Version format (no prerelease suffix)
+          VSIX_VERSION="${VERSION%%-*}"
+          echo "VSIX_VERSION=$VSIX_VERSION" >> "$GITHUB_ENV"
 
       - name: Stamp version in VS Extension manifest
         shell: pwsh
         run: |
           $manifest = "src/PrinciPal.VsExtension/source.extension.vsixmanifest"
-          (Get-Content $manifest) -replace 'Version="[^"]*"(\s+Language=)', "Version=`"${{ env.RESOLVED_VERSION }}`"`$1" |
+          (Get-Content $manifest) -replace 'Version="[^"]*"(\s+Language=)', "Version=`"${{ env.VSIX_VERSION }}`"`$1" |
             Set-Content $manifest
 
       - name: Stamp version in VS Code extension package.json
