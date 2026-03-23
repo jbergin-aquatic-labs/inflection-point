@@ -1,9 +1,14 @@
 {
-  "name": "inflection_point_vscode",
+  "name": "inflection-point-vscode",
   "displayName": "Inflection Point",
   "description": "Bridge VS Code/Cursor debugger state to MCP so chat models can read stack, locals, and breakpoints.",
   "version": "1.0.0",
   "publisher": "inflection-point",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jbergin-aquatic-labs/inflection-point.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -123,7 +128,8 @@
     "watch": "tsc --noEmit --watch -p ./",
     "bundle": "node esbuild.js",
     "vscode:prepublish": "npm run bundle -- --production",
-    "package": "vsce package --no-dependencies",
+    "vsix": "vsce package --no-dependencies -o inflection-point.vsix",
+    "package": "npm run vsix",
     "test": "echo \"no unit tests in-tree yet\""
   },
   "devDependencies": {

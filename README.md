@@ -1,33 +1,36 @@
 # Inflection Point (TypeScript)
 
-Bridge **VS Code / Cursor** debug sessions to AI tools over the **Model Context Protocol**. This repo is **TypeScript only**: an **MCP server** and a **VS Code extension**. There is no .NET runtime.
+Bridge **Cursor / VS Code** debug sessions to AI tools over **MCP**. This repo is **TypeScript only**: an MCP server plus an extension. **You can run everything in your normal Cursor window** — no second “Extension Development Host” required if you install the `.vsix`.
 
-## Repository layout
+---
 
-| Path | Role |
-|------|------|
-| `mcp_server/` | REST API (`/api/*`) + **streamable MCP** on **`/`** and **`/mcp`** |
-| `vscode_extension/` | DAP capture, **Inflection Point** activity bar (server status, MCP URL, copy snippet) |
+## Setup (three parts)
 
-Naming uses **snake_case** for source files, types, and JSON fields (`is_in_break_mode`, `file_path`, …).
-
-## Prerequisites
-
-- Node.js 18+
-- VS Code or Cursor 1.85+
-
-## Build
+### Part 1 — Build everything (from repo root)
 
 ```bash
+cd /path/to/inflection-point
 npm ci
 npm run build
 ```
 
-Produces `mcp_server/dist`, `vscode_extension/server/inflection_point_mcp_server.cjs` (gitignored), and `vscode_extension/out/extension_entry.js`.
+This:
 
-## Cursor / VS Code MCP config
+- Compiles **`mcp_server`**
+- Bundles the server into **`vscode_extension/server/inflection_point_mcp_server.cjs`**
+- Builds the extension and produces **`vscode_extension/inflection-point.vsix`**
 
-The server speaks **streamable HTTP**. You may set **`url` to the origin** (what Cursor often expects):
+If you only need the VSIX after a code change:
+
+```bash
+npm run build -w vscode_extension && npm run vsix -w vscode_extension
+```
+
+---
+
+### Part 2 — Add MCP settings (Cursor)
+
+Point Cursor at the local server. In your **MCP config** (often **`~/.cursor/mcp.json`**, or Cursor **Settings → MCP**), add:
 
 ```json
 {
@@ -39,42 +42,53 @@ The server speaks **streamable HTTP**. You may set **`url` to the origin** (what
 }
 ```
 
-`/mcp` also works. Use **`127.0.0.1`** if `localhost` resolution causes issues.
+Reload MCP or restart Cursor so it picks this up.
 
-**Important:** The MCP app must **not** run global `express.json()` over MCP routes — that leads to `stream is not readable`. JSON parsing is scoped to `/api` only in this codebase.
+---
 
-## Run the server alone
+### Part 3 — Install the extension **in this Cursor window** and let it start the server
+
+1. In **the same Cursor instance** you use daily: **Command Palette** (`Cmd+Shift+P`) → **Extensions: Install from VSIX…**
+2. Choose **`vscode_extension/inflection-point.vsix`** from your clone.
+3. **Reload** if Cursor asks.
+4. With defaults (**`inflection_point.auto_start`: true**), the extension starts the bundled MCP server when it activates (on window startup). Check **View → Output → “Inflection Point”** if something fails.
+5. Use the **Inflection Point** icon in the **activity bar** to see server status, port, and **copy MCP URL / mcp.json snippet**.
+
+Then open your app folder, **start debugging**, hit a **breakpoint**, and use **chat** — models can call MCP tools (`list_sessions`, `get_debug_state`, etc.) against your session.
+
+**Optional:** run the server yourself instead of auto-start:
 
 ```bash
 npm run start:server
 ```
 
-Port **9229** by default; `--port 9333` to override. Health: `GET http://127.0.0.1:9229/api/health`.
+and set **`inflection_point.auto_start`** to `false` in Settings.
 
-## Extension (F5 / VSIX)
+---
 
-1. `npm run build`
-2. Open folder **`vscode_extension`**
-3. **Run Extension**
+## Optional: develop the extension (second window)
 
-The **Inflection Point** icon in the activity bar opens a tree: server reachability, port, debug session, MCP URL (click to copy), and toolbar actions to copy a full `mcp.json` snippet or refresh.
+Only if you are **changing extension code**: open the **repo root** in Cursor and **F5** → **Launch Extension (Dev Host)**. For normal use, **Part 3 + VSIX** is enough.
 
-VS Code settings: **`inflection_point.*`** (port, auto-start, capture limits).
+---
 
-## MCP tools
+## Layout
 
-`list_sessions`, `get_debug_state`, `get_locals`, `get_call_stack`, `get_source_context`, `get_breakpoints`, `get_expression_result`, `explain_current_state`, `get_breakpoint_history`, `get_snapshot`, `explain_execution_flow`.
+| Path | Role |
+|------|------|
+| `mcp_server/` | REST `/api/*` + streamable MCP on `/` and `/mcp` |
+| `vscode_extension/` | Extension + bundled server + **`inflection-point.vsix`** after build |
 
-## Package VSIX
+## Health check
 
 ```bash
-npm run build
-cd vscode_extension
-npx vsce package --no-dependencies
+curl -s http://127.0.0.1:9229/api/health
 ```
 
-You need a valid `publisher` in `package.json` for the marketplace; for local install, VS Code accepts a local `.vsix` from **Extensions → Install from VSIX**.
+## Settings
+
+`inflection_point.port`, `inflection_point.auto_start`, `inflection_point.capture.*`, `inflection_point.max_json_payload_chars`
 
 ## License
 
-GNU General Public License v3.0 — see [LICENSE](LICENSE).
+GPL-3.0 — see [LICENSE](LICENSE).

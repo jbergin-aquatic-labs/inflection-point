@@ -16,6 +16,8 @@ npm ci
 npm run build
 ```
 
+Produces `vscode_extension/inflection-point.vsix` (extension `name` must be hyphenated, e.g. `inflection-point-vscode`).
+
 ## Cursor `mcp.json`
 
 Use the **server root** URL (trailing slash is fine):

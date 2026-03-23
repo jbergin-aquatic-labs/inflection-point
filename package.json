@@ -4,7 +4,7 @@
   "description": "Inflection Point: VS Code debug bridge + TypeScript MCP server",
   "workspaces": ["mcp_server", "vscode_extension"],
   "scripts": {
-    "build": "npm run build -w mcp_server && npm run bundle:server-for-extension && npm run build -w vscode_extension",
+    "build": "npm run build -w mcp_server && npm run bundle:server-for-extension && npm run build -w vscode_extension && npm run vsix -w vscode_extension",
     "build:server": "npm run build -w mcp_server",
     "build:extension": "npm run build -w vscode_extension",
     "bundle:server-for-extension": "node scripts/bundle_mcp_for_extension.mjs",
