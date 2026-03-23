@@ -31,6 +31,41 @@ export class vscode_debugger_adapter implements i_debugger_reader {
         return this.break_by_session.has(session.id);
     }
 
+    /**
+     * Some adapters omit threadId on stopped events; a wrong hint (e.g. default 1) yields empty stack reads.
+     */
+    async resolve_stopped_thread_id(session: vscode.DebugSession, hint?: number): Promise<number> {
+        const hint_ok =
+            hint !== undefined && hint !== null && !Number.isNaN(hint)
+                ? await this.thread_has_stack_frames(session, hint)
+                : false;
+        if (hint_ok) return hint as number;
+        try {
+            const r = await session.customRequest("threads", {});
+            const threads = (r.threads as { id: number }[]) ?? [];
+            for (const t of threads) {
+                if (await this.thread_has_stack_frames(session, t.id)) return t.id;
+            }
+        } catch {
+            /* fall through */
+        }
+        return hint !== undefined && hint !== null && !Number.isNaN(hint) ? hint : 1;
+    }
+
+    private async thread_has_stack_frames(session: vscode.DebugSession, thread_id: number): Promise<boolean> {
+        try {
+            const st = await session.customRequest("stackTrace", {
+                threadId: thread_id,
+                startFrame: 0,
+                levels: 1,
+            });
+            const frames = st.stackFrames as unknown[] | undefined;
+            return Array.isArray(frames) && frames.length > 0;
+        } catch {
+            return false;
+        }
+    }
+
     private thread_id_for(session: vscode.DebugSession): number {
         return this.break_by_session.get(session.id)?.thread_id ?? 1;
     }

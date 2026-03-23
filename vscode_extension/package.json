@@ -30,6 +30,11 @@
           "default": true,
           "description": "Start the MCP server when the extension activates (if not already running)."
         },
+        "inflection_point.trace_dap": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log debug adapter protocol event types to the Inflection Point output channel (troubleshooting)."
+        },
         "inflection_point.capture.max_local_depth": {
           "type": "number",
           "default": 2,
