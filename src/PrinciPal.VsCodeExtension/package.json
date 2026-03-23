@@ -88,11 +88,12 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "build": "npm run compile",
+    "compile": "node ./node_modules/typescript/lib/tsc.js -p ./",
+    "watch": "node ./node_modules/typescript/lib/tsc.js --watch -p ./",
     "bundle": "node esbuild.js",
-    "lint": "tsc --noEmit",
-    "vscode:prepublish": "node esbuild.js --production",
+    "lint": "node ./node_modules/typescript/lib/tsc.js --noEmit -p ./",
+    "vscode:prepublish": "npm run bundle -- --production",
     "package": "vsce package --no-dependencies",
     "pretest": "npm run compile",
     "test": "echo No in-tree tests — see tests/unit/PrinciPal.VsCodeExtension.Tests"
