@@ -164,9 +164,9 @@ export function shrink_debug_state_if_needed(state: debug_state, max_chars: numb
         ...state,
         locals: [
             {
-                name: "[principal]",
+                name: "[inflection_point]",
                 value:
-                    "Debug state JSON exceeded principal.max_json_payload_chars; locals replaced. Lower principal.capture.* limits or increase max_json_payload_chars.",
+                    "Debug state JSON exceeded inflection_point.max_json_payload_chars; locals replaced. Lower inflection_point.capture.* limits or increase max_json_payload_chars.",
                 type: "notice",
                 is_valid_value: true,
                 members: [],
@@ -183,7 +183,7 @@ export function shrink_debug_state_if_needed(state: debug_state, max_chars: numb
         current_location: state.current_location,
         locals: [
             {
-                name: "[principal]",
+                name: "[inflection_point]",
                 value: "payload still exceeds limit after emergency shrink.",
                 type: "notice",
                 is_valid_value: true,

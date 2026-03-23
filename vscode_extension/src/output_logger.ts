@@ -5,7 +5,7 @@ export class output_logger implements i_extension_logger {
     private readonly channel: vscode.OutputChannel;
 
     constructor() {
-        this.channel = vscode.window.createOutputChannel("principal");
+        this.channel = vscode.window.createOutputChannel("Inflection Point");
     }
 
     log(message: string): void {

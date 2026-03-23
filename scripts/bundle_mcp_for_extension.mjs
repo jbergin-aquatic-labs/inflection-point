@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 const out_dir = path.join(root, "vscode_extension", "server");
-const outfile = path.join(out_dir, "principal_mcp_server.cjs");
+const outfile = path.join(out_dir, "inflection_point_mcp_server.cjs");
 
 fs.mkdirSync(out_dir, { recursive: true });
 
@@ -17,7 +17,7 @@ await esbuild.build({
     target: "node18",
     format: "cjs",
     outfile,
-    banner: { js: "/* bundled principal MCP server — do not edit */" },
+    banner: { js: "/* bundled inflection_point MCP server */" },
     logLevel: "info",
 });
 

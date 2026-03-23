@@ -22,7 +22,7 @@ export class debug_query_service {
 
     list_sessions(): str_result {
         const list = this.sessions.get_all_sessions();
-        if (list.length === 0) return ok("No Visual Studio sessions connected.");
+        if (list.length === 0) return ok("No debugger sessions connected.");
         const lines = [`${list.length} session(s):`];
         for (const s of list) {
             const status = s.has_debug_state ? "debugging" : "idle";

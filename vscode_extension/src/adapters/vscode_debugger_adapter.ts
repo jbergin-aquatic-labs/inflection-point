@@ -143,7 +143,7 @@ export class vscode_debugger_adapter implements i_debugger_reader {
             result.push({
                 name: `… (+${skipped} more at this level)`,
                 value: "",
-                type: "principal.capped",
+                type: "inflection_point.capped",
                 is_valid_value: true,
                 members: [],
             });
@@ -214,12 +214,12 @@ export class vscode_debugger_adapter implements i_debugger_reader {
             const capped = prioritized.slice(0, kept_for_real);
             const omitted = result.length - capped.length;
             capped.push({
-                file_path: "(principal)",
+                file_path: "(inflection_point)",
                 line: 0,
                 column: 0,
                 function_name: `+${omitted} breakpoints omitted`,
                 enabled: false,
-                condition: "raise principal.capture.max_breakpoints to send more.",
+                condition: "raise inflection_point.capture.max_breakpoints to send more.",
             });
             return success(capped);
         } catch (e) {

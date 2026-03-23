@@ -1,11 +1,13 @@
-# principal (TypeScript)
+# Inflection Point (TypeScript)
 
 VS Code / Cursor debugger bridge to AI editors via MCP.
 
 ## Layout
 
-- `mcp_server/` — Node MCP + REST API (`/api/*`, MCP POST `/mcp`)
-- `vscode_extension/` — VS Code extension (esbuild → `out/extension_entry.js`)
+- `mcp_server/` — Node MCP + REST (`/api/*`, streamable MCP on `/` and `/mcp`)
+- `vscode_extension/` — Extension + sidebar status; esbuild → `out/extension_entry.js`
+
+**Do not** apply `express.json()` globally on the MCP app — it breaks streamable HTTP (`stream is not readable`). JSON parsing is only mounted under `/api`.
 
 ## Build
 
@@ -14,16 +16,12 @@ npm ci
 npm run build
 ```
 
-## Run MCP server only
+## Cursor `mcp.json`
 
-```bash
-npm run start:server
-# or
-node mcp_server/dist/main.js --port 9229
+Use the **server root** URL (trailing slash is fine):
+
+```json
+"inflection-point": { "url": "http://127.0.0.1:9229/" }
 ```
 
-## MCP URL for editors
-
-Use `http://127.0.0.1:9229/mcp` (not the bare origin).
-
-Configuration keys for the extension live under `principal.*` in VS Code settings.
+Settings in VS Code: `inflection_point.*`.

@@ -1,73 +1,120 @@
 {
-  "name": "principal_vscode",
-  "displayName": "princiPal",
-  "description": "Bridges VS Code/Cursor debugger state to MCP-compatible AI editors for AI-assisted debugging.",
+  "name": "inflection_point_vscode",
+  "displayName": "Inflection Point",
+  "description": "Bridge VS Code/Cursor debugger state to MCP so chat models can read stack, locals, and breakpoints.",
   "version": "1.0.0",
-  "publisher": "principal",
+  "publisher": "inflection-point",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": ["Debuggers"],
-  "keywords": ["debugger", "AI", "MCP", "Claude", "Cursor"],
+  "keywords": ["debugger", "AI", "MCP", "Cursor"],
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension_entry.js",
   "contributes": {
     "configuration": {
-      "title": "principal",
+      "title": "Inflection Point",
       "properties": {
-        "principal.port": {
+        "inflection_point.port": {
           "type": "number",
           "default": 9229,
-          "description": "Port for the MCP server."
+          "description": "Port for the MCP + REST server."
         },
-        "principal.auto_start": {
+        "inflection_point.auto_start": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically start the MCP server when the extension activates."
+          "description": "Start the MCP server when the extension activates (if not already running)."
         },
-        "principal.capture.max_local_depth": {
+        "inflection_point.capture.max_local_depth": {
           "type": "number",
           "default": 2,
           "minimum": 0,
           "maximum": 6
         },
-        "principal.capture.max_variables_per_level": {
+        "inflection_point.capture.max_variables_per_level": {
           "type": "number",
           "default": 200,
           "minimum": 1,
           "maximum": 2000
         },
-        "principal.capture.max_total_local_nodes": {
+        "inflection_point.capture.max_total_local_nodes": {
           "type": "number",
           "default": 1200,
           "minimum": 10,
           "maximum": 50000
         },
-        "principal.capture.max_value_length": {
+        "inflection_point.capture.max_value_length": {
           "type": "number",
           "default": 4096,
           "minimum": 128,
           "maximum": 1000000
         },
-        "principal.capture.max_stack_frames": {
+        "inflection_point.capture.max_stack_frames": {
           "type": "number",
           "default": 12,
           "minimum": 1,
           "maximum": 200
         },
-        "principal.capture.max_breakpoints": {
+        "inflection_point.capture.max_breakpoints": {
           "type": "number",
           "default": 150,
           "minimum": 1,
           "maximum": 10000
         },
-        "principal.max_json_payload_chars": {
+        "inflection_point.max_json_payload_chars": {
           "type": "number",
           "default": 1500000,
           "minimum": 50000,
           "maximum": 20000000
         }
       }
+    },
+    "commands": [
+      {
+        "command": "inflection_point.copy_mcp_url",
+        "title": "Inflection Point: Copy MCP URL"
+      },
+      {
+        "command": "inflection_point.copy_mcp_json_snippet",
+        "title": "Inflection Point: Copy mcp.json snippet"
+      },
+      {
+        "command": "inflection_point.refresh_status",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "inflection_point.copy_mcp_json_snippet",
+          "when": "view == inflection_point_status",
+          "group": "navigation@1"
+        },
+        {
+          "command": "inflection_point.refresh_status",
+          "when": "view == inflection_point_status",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "inflection_point_sidebar",
+          "title": "Inflection Point",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "inflection_point_sidebar": [
+        {
+          "id": "inflection_point_status",
+          "name": "Debug bridge",
+          "contextualTitle": "Inflection Point"
+        }
+      ]
     }
   },
   "scripts": {

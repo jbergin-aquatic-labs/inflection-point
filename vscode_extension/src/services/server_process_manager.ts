@@ -14,7 +14,7 @@ interface resolved_start_info {
 }
 
 /**
- * Starts the TypeScript MCP server (Node). Release builds may ship server/principal_mcp_server.cjs.
+ * Starts the TypeScript MCP server (Node). Release builds ship server/inflection_point_mcp_server.cjs.
  */
 export class server_process_manager {
     private readonly logger: i_extension_logger;
@@ -86,7 +86,7 @@ export class server_process_manager {
 
     private resolve_start_info(): result<resolved_start_info> {
         const port_args = ["--port", String(this.port)];
-        const bundled = path.join(this.extension_dir, "server", "principal_mcp_server.cjs");
+        const bundled = path.join(this.extension_dir, "server", "inflection_point_mcp_server.cjs");
         if (fs.existsSync(bundled)) {
             this.logger.log(`using bundled server: ${bundled}`);
             return success({

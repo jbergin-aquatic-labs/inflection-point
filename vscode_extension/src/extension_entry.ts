@@ -7,16 +7,20 @@ import { debug_event_coordinator } from "./services/debug_event_coordinator";
 import { debug_adapter_tracker_factory } from "./services/debug_adapter_tracker_factory";
 import { server_process_manager } from "./services/server_process_manager";
 import { load_debug_capture_limits } from "./debug_capture_limits";
+import {
+    inflection_point_status_provider,
+    start_status_refresh,
+} from "./inflection_point_status_provider";
 
 let logger: output_logger | undefined;
 let publisher: http_debug_state_publisher | undefined;
 let process_manager: server_process_manager | undefined;
 let coordinator: debug_event_coordinator | undefined;
+let status_provider: inflection_point_status_provider | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     logger = new output_logger();
-
-    const config = vscode.workspace.getConfiguration("principal");
+    const config = vscode.workspace.getConfiguration("inflection_point");
     const port = config.get<number>("port", 9229);
     const auto_start = config.get<boolean>("auto_start", true);
 
@@ -36,6 +40,53 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         workspace_path = "";
     }
 
+    status_provider = new inflection_point_status_provider();
+    status_provider.set_context({
+        port,
+        session_label: `${session_name} [${session_id}]`,
+    });
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider("inflection_point_status", status_provider)
+    );
+    context.subscriptions.push(start_status_refresh(status_provider, 2500));
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("inflection_point.copy_mcp_url", async (url?: string) => {
+            const u = url ?? `http://127.0.0.1:${port}/`;
+            await vscode.env.clipboard.writeText(u);
+            void vscode.window.showInformationMessage("Copied MCP URL (use as \"url\" in mcp.json).");
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("inflection_point.copy_mcp_json_snippet", async () => {
+            const mcp_url = `http://127.0.0.1:${port}/`;
+            const snippet = JSON.stringify(
+                {
+                    mcpServers: {
+                        "inflection-point": {
+                            url: mcp_url,
+                        },
+                    },
+                },
+                null,
+                2
+            );
+            await vscode.env.clipboard.writeText(snippet);
+            void vscode.window.showInformationMessage("Copied mcp.json snippet to clipboard.");
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("inflection_point.refresh_status", () => {
+            status_provider?.refresh();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.debug.onDidChangeActiveDebugSession(() => status_provider?.refresh())
+    );
+
     if (auto_start) {
         const running = await server_process_manager.is_server_running(port, 3000);
         if (running) {
@@ -44,13 +95,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             process_manager = new server_process_manager(logger);
             await process_manager.start(port);
         }
-        const mcp_url = `http://127.0.0.1:${port}/mcp`;
-        logger.log(`MCP config: { "mcpServers": { "principal": { "url": "${mcp_url}" } } }`);
+        const mcp_url = `http://127.0.0.1:${port}/`;
+        logger.log(`MCP: set mcp.json to use url "${mcp_url}" (streamable HTTP; root path is ok).`);
     } else {
-        logger.log(`auto-start disabled; run the server manually on port ${port}.`);
+        logger.log(`auto-start disabled; run mcp_server manually on port ${port}.`);
     }
 
-    const get_capture_limits = () => load_debug_capture_limits(vscode.workspace.getConfiguration("principal"));
+    const get_capture_limits = () =>
+        load_debug_capture_limits(vscode.workspace.getConfiguration("inflection_point"));
 
     const adapter = new vscode_debugger_adapter(get_capture_limits);
     publisher = new http_debug_state_publisher(
@@ -82,7 +134,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     });
 
     logger.log(`session: ${session_name} [${session_id}]`);
-    logger.log("principal extension activated.");
+    logger.log("Inflection Point extension activated.");
 }
 
 export async function deactivate(): Promise<void> {

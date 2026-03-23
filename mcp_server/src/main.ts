@@ -26,7 +26,9 @@ function main(): void {
     const app = create_app(sessions, query);
 
     const server = app.listen(port, "127.0.0.1", () => {
-        console.error(`principal_mcp_server listening on http://127.0.0.1:${port}/ (MCP POST /mcp)`);
+        console.error(
+            `inflection_point_mcp_server listening on http://127.0.0.1:${port}/ (MCP streamable HTTP: GET/POST / or /mcp)`
+        );
     });
 
     let phase: watchdog_phase = "waiting_for_first_session";

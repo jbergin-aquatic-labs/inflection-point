@@ -7,33 +7,37 @@ import type { debug_query_service } from "./debug_query_service.js";
 import { register_debug_tools } from "./mcp_tools.js";
 import type { debug_state, expression_result } from "./domain_types.js";
 
+/**
+ * JSON body parsing is limited to /api only. Global json() breaks MCP streamable HTTP
+ * (GET/SSE and POST) because it consumes or rejects the request stream before handleRequest runs.
+ */
 export function create_app(sessions: session_manager, query: debug_query_service): express.Application {
     const app = createMcpExpressApp();
-    app.use(express.json({ limit: "50mb" }));
 
-    app.get("/api/health", (_req, res) => {
+    const api = express.Router();
+    api.use(express.json({ limit: "50mb" }));
+
+    api.get("/health", (_req, res) => {
         res.json({ status: "running" });
     });
 
-    app.get("/api/sessions", (_req, res) => {
+    api.get("/sessions", (_req, res) => {
         res.json(sessions.get_all_sessions());
     });
 
-    app.post("/api/sessions/:session_id", (req, res) => {
+    api.post("/sessions/:session_id", (req, res) => {
         const name = (req.query.name as string | undefined) ?? undefined;
         const path_q = (req.query.path as string | undefined) ?? undefined;
         sessions.get_or_create_session(req.params.session_id, name, path_q);
         res.sendStatus(200);
     });
 
-    app.delete("/api/sessions/:session_id", (req, res) => {
+    api.delete("/sessions/:session_id", (req, res) => {
         sessions.remove_session(req.params.session_id);
         res.sendStatus(200);
     });
 
-    const debug_group = "/api/sessions/:session_id/debug-state";
-
-    app.post(debug_group, (req, res) => {
+    api.post("/sessions/:session_id/debug-state", (req, res) => {
         const name = (req.query.name as string | undefined) ?? undefined;
         const path_q = (req.query.path as string | undefined) ?? undefined;
         const store = sessions.get_or_create_session(req.params.session_id, name, path_q);
@@ -41,7 +45,7 @@ export function create_app(sessions: session_manager, query: debug_query_service
         res.sendStatus(200);
     });
 
-    app.post(`${debug_group}/expression`, (req, res) => {
+    api.post("/sessions/:session_id/debug-state/expression", (req, res) => {
         const name = (req.query.name as string | undefined) ?? undefined;
         const path_q = (req.query.path as string | undefined) ?? undefined;
         const store = sessions.get_or_create_session(req.params.session_id, name, path_q);
@@ -49,35 +53,35 @@ export function create_app(sessions: session_manager, query: debug_query_service
         res.sendStatus(200);
     });
 
-    app.delete(debug_group, (req, res) => {
+    api.delete("/sessions/:session_id/debug-state", (req, res) => {
         const store = sessions.get_session(req.params.session_id);
         store?.clear();
         res.sendStatus(200);
     });
 
-    app.get(`${debug_group}/history`, (req, res) => {
+    api.get("/sessions/:session_id/debug-state/history", (req, res) => {
         const store = sessions.get_session(req.params.session_id);
         const history = store?.get_history() ?? [];
         res.json(history);
     });
 
-    app.delete(`${debug_group}/history`, (req, res) => {
+    api.delete("/sessions/:session_id/debug-state/history", (req, res) => {
         sessions.get_session(req.params.session_id)?.clear_history();
         res.sendStatus(200);
     });
 
-    app.get("/", (_req, res) => {
-        res.type("json").send(
-            JSON.stringify({
-                service: "principal_mcp_server",
-                mcp_post: "/mcp",
-                health: "/api/health",
-            })
-        );
+    app.use("/api", api);
+
+    app.get("/about", (_req, res) => {
+        res.json({
+            service: "inflection_point_mcp_server",
+            mcp: "POST or GET / (streamable HTTP); also POST /mcp",
+            health: "/api/health",
+        });
     });
 
     const handle_mcp = async (req: express.Request, res: express.Response): Promise<void> => {
-        const server = new McpServer({ name: "principal", version: "1.0.0" });
+        const server = new McpServer({ name: "inflection-point", version: "1.0.0" });
         register_debug_tools(server, query);
         const transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: undefined,
@@ -102,6 +106,10 @@ export function create_app(sessions: session_manager, query: debug_query_service
         }
     };
 
+    // Cursor / clients often set MCP "url" to the server origin without /mcp
+    app.get("/", (req, res) => void handle_mcp(req, res));
+    app.post("/", (req, res) => void handle_mcp(req, res));
+    app.get("/mcp", (req, res) => void handle_mcp(req, res));
     app.post("/mcp", (req, res) => void handle_mcp(req, res));
 
     return app;

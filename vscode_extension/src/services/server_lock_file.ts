@@ -11,7 +11,7 @@ export class server_lock_file {
             process.platform === "win32"
                 ? process.env.LOCALAPPDATA ?? process.env.TEMP ?? "."
                 : process.env.HOME ?? "/tmp";
-        return path.join(base, "principal", `mcp-${port}.lock`);
+        return path.join(base, "inflection_point", `mcp-${port}.lock`);
     }
 
     static try_acquire(port: number): result<acquired_lock> {

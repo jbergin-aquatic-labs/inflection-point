@@ -1,7 +1,7 @@
 {
-  "name": "principal-monorepo",
+  "name": "inflection-point-monorepo",
   "private": true,
-  "description": "princiPal: VS Code debug bridge + TypeScript MCP server",
+  "description": "Inflection Point: VS Code debug bridge + TypeScript MCP server",
   "workspaces": ["mcp_server", "vscode_extension"],
   "scripts": {
     "build": "npm run build -w mcp_server && npm run bundle:server-for-extension && npm run build -w vscode_extension",
