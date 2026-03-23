@@ -11,6 +11,7 @@ import {
     inflection_point_status_provider,
     start_status_refresh,
 } from "./inflection_point_status_provider";
+import { create_workspace_session_identity_resolver } from "./workspace_session_identity";
 
 let logger: output_logger | undefined;
 let publisher: http_debug_state_publisher | undefined;
@@ -25,7 +26,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const auto_start = config.get<boolean>("auto_start", true);
 
     const workspace_folders = vscode.workspace.workspaceFolders;
-    let session_id: string;
+    let primary_session_id: string;
     let session_name: string;
     let workspace_path: string;
 
@@ -33,17 +34,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         workspace_path = workspace_folders[0].uri.fsPath;
         session_name = workspace_folders[0].name;
         const hash = crypto.createHash("sha256").update(workspace_path.toLowerCase()).digest("hex");
-        session_id = hash.substring(0, 8);
+        primary_session_id = hash.substring(0, 8);
     } else {
-        session_id = `vscode-${process.pid}`;
-        session_name = session_id;
+        primary_session_id = `vscode-${process.pid}`;
+        session_name = primary_session_id;
         workspace_path = "";
     }
+
+    const fallback_identity = {
+        session_id: primary_session_id,
+        session_name,
+        workspace_path,
+    };
+    const resolve_identity = create_workspace_session_identity_resolver(fallback_identity);
 
     status_provider = new inflection_point_status_provider();
     status_provider.set_context({
         port,
-        session_label: `${session_name} [${session_id}]`,
+        session_label: `${session_name} [${primary_session_id}]`,
     });
     context.subscriptions.push(
         vscode.window.registerTreeDataProvider("inflection_point_status", status_provider)
@@ -107,9 +115,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const adapter = new vscode_debugger_adapter(get_capture_limits);
     publisher = new http_debug_state_publisher(
         port,
-        session_id,
-        session_name,
-        workspace_path,
+        resolve_identity,
         undefined,
         5000,
         500,
@@ -118,7 +124,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     coordinator = new debug_event_coordinator(adapter, publisher, logger);
 
-    const tracker_factory = new debug_adapter_tracker_factory(adapter, coordinator, logger);
+    const trace_dap = config.get<boolean>("trace_dap", false);
+    const tracker_factory = new debug_adapter_tracker_factory(adapter, coordinator, logger, trace_dap);
     context.subscriptions.push(vscode.debug.registerDebugAdapterTrackerFactory("*", tracker_factory));
 
     const reg = await coordinator.register();
@@ -133,7 +140,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         },
     });
 
-    logger.log(`session: ${session_name} [${session_id}]`);
+    logger.log(`session: ${session_name} [${primary_session_id}] (pushes use each debug session's workspace folder when set)`);
     logger.log("Inflection Point extension activated.");
 }
 

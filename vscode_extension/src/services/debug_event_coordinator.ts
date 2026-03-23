@@ -36,12 +36,12 @@ export class debug_event_coordinator {
         return state;
     }
 
-    async publish_state(state: debug_state): Promise<result> {
-        return this.publisher.push_debug_state(state);
+    async publish_state(session: DebugSession, state: debug_state): Promise<result> {
+        return this.publisher.push_debug_state(state, session);
     }
 
-    async clear_state(): Promise<result> {
-        return this.publisher.clear_debug_state();
+    async clear_state(session?: DebugSession): Promise<result> {
+        return this.publisher.clear_debug_state(session);
     }
 
     async register(): Promise<result> {

@@ -1,14 +1,18 @@
+import * as vscode from "vscode";
 import type { i_debug_state_publisher } from "../abstractions/i_debug_state_publisher";
 import type { debug_state, result } from "../types";
 import { success, failure, server_unreachable_error, request_timed_out_error } from "../types";
+import {
+    workspace_session_identity_from_folder,
+    type workspace_session_identity,
+} from "../workspace_session_identity";
 
 export type fetch_function = (url: string, init?: RequestInit) => Promise<Response>;
 export type max_payload_chars_source = () => number;
 
 export class http_debug_state_publisher implements i_debug_state_publisher {
     private readonly server_url: string;
-    private readonly session_id: string;
-    private readonly session_query_params: string;
+    private readonly resolve_identity: (session?: vscode.DebugSession) => workspace_session_identity;
     private readonly fetch_fn: fetch_function;
     private readonly timeout_ms: number;
     private readonly retry_base_delay_ms: number;
@@ -19,17 +23,14 @@ export class http_debug_state_publisher implements i_debug_state_publisher {
 
     constructor(
         port: number,
-        session_id: string,
-        session_name: string,
-        workspace_path: string,
+        resolve_identity: (session?: vscode.DebugSession) => workspace_session_identity,
         fetch_fn?: fetch_function,
         timeout_ms: number = 5000,
         retry_base_delay_ms: number = 500,
         heartbeat_interval_ms: number = 30_000,
         get_max_payload_chars?: max_payload_chars_source
     ) {
-        this.session_id = session_id;
-        this.session_query_params = `name=${encodeURIComponent(session_name)}&path=${encodeURIComponent(workspace_path)}`;
+        this.resolve_identity = resolve_identity;
         this.server_url = `http://127.0.0.1:${port}`;
         this.fetch_fn = fetch_fn ?? globalThis.fetch.bind(globalThis);
         this.timeout_ms = timeout_ms;
@@ -54,21 +55,32 @@ export class http_debug_state_publisher implements i_debug_state_publisher {
     }
 
     async register_session(): Promise<result> {
-        return this.send("register", () =>
-            this.do_fetch(
-                `${this.server_url}/api/sessions/${encodeURIComponent(this.session_id)}?${this.session_query_params}`,
-                { method: "POST" }
-            )
-        );
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders?.length) {
+            const id = this.resolve_identity(undefined);
+            return this.register_one_identity(id);
+        }
+        if (folders.length === 1) {
+            return this.register_one_identity(this.resolve_identity(undefined));
+        }
+        let last: result = success();
+        for (const folder of folders) {
+            const id = workspace_session_identity_from_folder(folder);
+            const r = await this.register_one_identity(id);
+            if (!r.ok) last = r;
+        }
+        return last;
     }
 
-    async push_debug_state(state: debug_state): Promise<result> {
+    async push_debug_state(state: debug_state, debug_session?: vscode.DebugSession): Promise<result> {
         const max_chars = this.get_max_payload_chars();
         const payload = shrink_debug_state_if_needed(state, max_chars);
         const body = JSON.stringify(payload);
+        const { session_id, session_name, workspace_path } = this.resolve_identity(debug_session);
+        const q = `name=${encodeURIComponent(session_name)}&path=${encodeURIComponent(workspace_path)}`;
         return this.send("push", () =>
             this.do_fetch(
-                `${this.server_url}/api/sessions/${encodeURIComponent(this.session_id)}/debug-state?${this.session_query_params}`,
+                `${this.server_url}/api/sessions/${encodeURIComponent(session_id)}/debug-state?${q}`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -78,21 +90,49 @@ export class http_debug_state_publisher implements i_debug_state_publisher {
         );
     }
 
-    async clear_debug_state(): Promise<result> {
+    async clear_debug_state(debug_session?: vscode.DebugSession): Promise<result> {
+        const { session_id } = this.resolve_identity(debug_session);
         return this.send("clear", () =>
             this.do_fetch(
-                `${this.server_url}/api/sessions/${encodeURIComponent(this.session_id)}/debug-state`,
+                `${this.server_url}/api/sessions/${encodeURIComponent(session_id)}/debug-state`,
                 { method: "DELETE" }
             )
         );
     }
 
     async deregister_session(): Promise<result> {
-        return this.send("deregister", () =>
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders?.length) {
+            const id = this.resolve_identity(undefined);
+            return this.deregister_one_identity(id);
+        }
+        if (folders.length === 1) {
+            return this.deregister_one_identity(this.resolve_identity(undefined));
+        }
+        let last: result = success();
+        for (const folder of folders) {
+            const id = workspace_session_identity_from_folder(folder);
+            const r = await this.deregister_one_identity(id);
+            if (!r.ok) last = r;
+        }
+        return last;
+    }
+
+    private async register_one_identity(id: workspace_session_identity): Promise<result> {
+        const q = `name=${encodeURIComponent(id.session_name)}&path=${encodeURIComponent(id.workspace_path)}`;
+        return this.send("register", () =>
             this.do_fetch(
-                `${this.server_url}/api/sessions/${encodeURIComponent(this.session_id)}`,
-                { method: "DELETE" }
-            ),
+                `${this.server_url}/api/sessions/${encodeURIComponent(id.session_id)}?${q}`,
+                { method: "POST" }
+            )
+        );
+    }
+
+    private async deregister_one_identity(id: workspace_session_identity): Promise<result> {
+        return this.send("deregister", () =>
+            this.do_fetch(`${this.server_url}/api/sessions/${encodeURIComponent(id.session_id)}`, {
+                method: "DELETE",
+            }),
             1
         );
     }
