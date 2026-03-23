@@ -1,0 +1,17 @@
+{
+  "name": "principal-monorepo",
+  "private": true,
+  "description": "princiPal: VS Code debug bridge + TypeScript MCP server",
+  "workspaces": ["mcp_server", "vscode_extension"],
+  "scripts": {
+    "build": "npm run build -w mcp_server && npm run bundle:server-for-extension && npm run build -w vscode_extension",
+    "build:server": "npm run build -w mcp_server",
+    "build:extension": "npm run build -w vscode_extension",
+    "bundle:server-for-extension": "node scripts/bundle_mcp_for_extension.mjs",
+    "start:server": "npm run start -w mcp_server",
+    "test": "npm run test -w vscode_extension"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.4"
+  }
+}

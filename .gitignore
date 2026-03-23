@@ -1,41 +1,10 @@
-## .NET
-bin/
-obj/
-*.user
-*.suo
-*.cache
-*.vspscc
-*.vssscc
-*.sln.docstates
-*.userprefs
-.vs/
-
-## NuGet
-*.nupkg
-**/packages/*
-!**/packages/build/
-
-## VSIX
-*.vsix
-
-## Build Results
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-[Aa][Rr][Mm]/
-[Aa][Rr][Mm]64/
-bld/
-[Bb]in/
-[Oo]bj/
-[Ll]og/
-[Ll]ogs/
-
-## Test Results
-TestResults/
-
-## Node / TypeScript (VS Code extension)
 node_modules/
 out/
+dist/
+*.vsix
 *.tsbuildinfo
-src/PrinciPal.VsCodeExtension/Server/
+.vs/
+.DS_Store
+
+# Bundled MCP server artifact (regenerate with npm run build)
+vscode_extension/server/principal_mcp_server.cjs

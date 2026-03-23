@@ -1,0 +1,89 @@
+{
+  "name": "principal_vscode",
+  "displayName": "princiPal",
+  "description": "Bridges VS Code/Cursor debugger state to MCP-compatible AI editors for AI-assisted debugging.",
+  "version": "1.0.0",
+  "publisher": "principal",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Debuggers"],
+  "keywords": ["debugger", "AI", "MCP", "Claude", "Cursor"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension_entry.js",
+  "contributes": {
+    "configuration": {
+      "title": "principal",
+      "properties": {
+        "principal.port": {
+          "type": "number",
+          "default": 9229,
+          "description": "Port for the MCP server."
+        },
+        "principal.auto_start": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start the MCP server when the extension activates."
+        },
+        "principal.capture.max_local_depth": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 6
+        },
+        "principal.capture.max_variables_per_level": {
+          "type": "number",
+          "default": 200,
+          "minimum": 1,
+          "maximum": 2000
+        },
+        "principal.capture.max_total_local_nodes": {
+          "type": "number",
+          "default": 1200,
+          "minimum": 10,
+          "maximum": 50000
+        },
+        "principal.capture.max_value_length": {
+          "type": "number",
+          "default": 4096,
+          "minimum": 128,
+          "maximum": 1000000
+        },
+        "principal.capture.max_stack_frames": {
+          "type": "number",
+          "default": 12,
+          "minimum": 1,
+          "maximum": 200
+        },
+        "principal.capture.max_breakpoints": {
+          "type": "number",
+          "default": 150,
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "principal.max_json_payload_chars": {
+          "type": "number",
+          "default": 1500000,
+          "minimum": 50000,
+          "maximum": 20000000
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "npm run bundle",
+    "compile": "tsc --noEmit -p ./",
+    "watch": "tsc --noEmit --watch -p ./",
+    "bundle": "node esbuild.js",
+    "vscode:prepublish": "npm run bundle -- --production",
+    "package": "vsce package --no-dependencies",
+    "test": "echo \"no unit tests in-tree yet\""
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.27.4",
+    "typescript": "^5.3.3"
+  }
+}

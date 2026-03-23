@@ -1,27 +1,29 @@
-# princiPal
+# principal (TypeScript)
 
-Bridges VS 2022 / VS Code debugger state to AI editors via MCP.
+VS Code / Cursor debugger bridge to AI editors via MCP.
 
-## Project Structure
+## Layout
 
-```
-src/
-  PrinciPal.Domain/          # Domain models and interfaces
-  PrinciPal.Application/     # Application logic and services
-  PrinciPal.Infrastructure/  # External concerns (persistence, integrations)
-  PrinciPal.Common/          # Shared utilities
-  PrinciPal.Server/          # ASP.NET host — API + MCP server (localhost:9229)
-  PrinciPal.VsExtension/     # VSIX for Visual Studio 2022
-  PrinciPal.VsCodeExtension/ # VSIX for VS Code / Cursor
-tests/
-  unit/                      # Unit tests mirroring src/ projects
-  integration/               # Integration tests
-  smoke/                     # Smoke tests
-```
+- `mcp_server/` — Node MCP + REST API (`/api/*`, MCP POST `/mcp`)
+- `vscode_extension/` — VS Code extension (esbuild → `out/extension_entry.js`)
 
-## Build & Test
+## Build
 
 ```bash
-dotnet build          # Build all
-dotnet test           # Run all tests
+npm ci
+npm run build
 ```
+
+## Run MCP server only
+
+```bash
+npm run start:server
+# or
+node mcp_server/dist/main.js --port 9229
+```
+
+## MCP URL for editors
+
+Use `http://127.0.0.1:9229/mcp` (not the bare origin).
+
+Configuration keys for the extension live under `principal.*` in VS Code settings.
