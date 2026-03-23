@@ -85,6 +85,18 @@ Only if you are **changing extension code**: open the **repo root** in Cursor an
 curl -s http://127.0.0.1:9229/api/health
 ```
 
+## Troubleshooting MCP (`fetch failed`, `ECONNREFUSED 127.0.0.1:9229`)
+
+The server must **keep listening** while Cursor is open. Earlier builds **exited automatically** when no VS Code extension session was registered for a short grace period, which **killed port 9229** and broke MCP reconnects.
+
+**Current behavior:** the process **does not exit on idle** unless you set:
+
+```bash
+export INFLECTION_POINT_EXIT_ON_IDLE=1
+```
+
+If MCP drops anyway: confirm the extension **Inflection Point** is enabled, **`inflection_point.auto_start`** is on, and check **Output → Inflection Point**. Or start the server manually: `npm run start:server`.
+
 ## Settings
 
 `inflection_point.port`, `inflection_point.auto_start`, `inflection_point.capture.*`, `inflection_point.max_json_payload_chars`
