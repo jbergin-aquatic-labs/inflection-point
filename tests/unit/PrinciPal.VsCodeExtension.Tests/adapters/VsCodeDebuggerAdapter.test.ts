@@ -1,12 +1,25 @@
 import { VsCodeDebuggerAdapter } from "../../../../src/PrinciPal.VsCodeExtension/src/adapters/VsCodeDebuggerAdapter";
+import { defaultDebugCaptureLimits } from "../../../../src/PrinciPal.VsCodeExtension/src/debugCaptureLimits";
 // Import from "vscode" — moduleNameMapper resolves to __mocks__/vscode.ts
 import * as vscode from "vscode";
 
-const debug = vscode.debug as typeof vscode.debug & { activeDebugSession: any; breakpoints: any[] };
+const debug = vscode.debug as typeof vscode.debug & { breakpoints: any[] };
 const SourceBreakpoint = vscode.SourceBreakpoint;
 
-function createMockSession(customRequestImpl?: (cmd: string, args?: any) => any) {
+const mockSession = {
+    id: "test-session",
+    name: "TestSession",
+    type: "node",
+    customRequest: jest.fn(),
+} as unknown as vscode.DebugSession;
+
+function createMockSession(
+    customRequestImpl?: (cmd: string, args?: any) => any
+): vscode.DebugSession {
     return {
+        id: "dynamic-session",
+        name: "TestSession",
+        type: "node",
         customRequest: jest.fn(
             customRequestImpl ??
                 ((cmd: string, args?: any) => {
@@ -32,9 +45,7 @@ function createMockSession(customRequestImpl?: (cmd: string, args?: any) => any)
                     }
                     if (cmd === "scopes") {
                         return Promise.resolve({
-                            scopes: [
-                                { name: "Locals", variablesReference: 100 },
-                            ],
+                            scopes: [{ name: "Locals", variablesReference: 100 }],
                         });
                     }
                     if (cmd === "variables") {
@@ -48,46 +59,43 @@ function createMockSession(customRequestImpl?: (cmd: string, args?: any) => any)
                     return Promise.resolve({});
                 })
         ),
-        name: "TestSession",
-        type: "node",
-        id: "session-1",
-    };
+    } as unknown as vscode.DebugSession;
 }
 
 describe("VsCodeDebuggerAdapter", () => {
     let adapter: VsCodeDebuggerAdapter;
 
     beforeEach(() => {
-        adapter = new VsCodeDebuggerAdapter();
-        // Reset debug mock state
-        debug.activeDebugSession = undefined;
+        adapter = new VsCodeDebuggerAdapter(() => defaultDebugCaptureLimits);
         debug.breakpoints = [];
     });
 
     describe("break mode tracking", () => {
         it("starts not in break mode", () => {
-            expect(adapter.isInBreakMode).toBe(false);
+            expect(adapter.isInBreakMode(mockSession)).toBe(false);
         });
 
-        it("setBreakMode sets isInBreakMode to true", () => {
-            adapter.setBreakMode(1);
-            expect(adapter.isInBreakMode).toBe(true);
+        it("setBreakMode sets isInBreakMode to true for that session", () => {
+            adapter.setBreakMode(mockSession, 1);
+            expect(adapter.isInBreakMode(mockSession)).toBe(true);
         });
 
-        it("clearBreakMode sets isInBreakMode to false", () => {
-            adapter.setBreakMode(1);
-            adapter.clearBreakMode();
-            expect(adapter.isInBreakMode).toBe(false);
+        it("clearBreakMode clears only that session", () => {
+            const other = { id: "other", name: "o", customRequest: jest.fn() } as unknown as vscode.DebugSession;
+            adapter.setBreakMode(mockSession, 1);
+            adapter.setBreakMode(other, 2);
+            adapter.clearBreakMode(mockSession);
+            expect(adapter.isInBreakMode(mockSession)).toBe(false);
+            expect(adapter.isInBreakMode(other)).toBe(true);
         });
     });
 
     describe("readCurrentLocation", () => {
         it("maps DAP stackFrame to SourceLocation", async () => {
             const session = createMockSession();
-            debug.activeDebugSession = session;
-            adapter.setBreakMode(1);
+            adapter.setBreakMode(session, 1);
 
-            const result = await adapter.readCurrentLocation();
+            const result = await adapter.readCurrentLocation(session);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
@@ -96,17 +104,6 @@ describe("VsCodeDebuggerAdapter", () => {
                 expect(result.value.column).toBe(5);
                 expect(result.value.functionName).toBe("main");
                 expect(result.value.projectName).toBe("TestSession");
-            }
-        });
-
-        it("returns error when no active session", async () => {
-            debug.activeDebugSession = undefined;
-
-            const result = await adapter.readCurrentLocation();
-
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                expect(result.error.code).toBe("Extension.DebugReadFailed");
             }
         });
     });
@@ -147,10 +144,9 @@ describe("VsCodeDebuggerAdapter", () => {
                 }
                 return Promise.resolve({});
             });
-            debug.activeDebugSession = session;
-            adapter.setBreakMode(1);
+            adapter.setBreakMode(session, 1);
 
-            const result = await adapter.readLocals(2);
+            const result = await adapter.readLocals(session, 2);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
@@ -162,15 +158,50 @@ describe("VsCodeDebuggerAdapter", () => {
                 expect(result.value[1].members[0].name).toBe("prop");
             }
         });
+
+        it("caps variables per level and reports overflow row", async () => {
+            const manyVars = Array.from({ length: 5 }, (_, i) => ({
+                name: `v${i}`,
+                value: `${i}`,
+                type: "number",
+                variablesReference: 0,
+            }));
+            const session = createMockSession((cmd) => {
+                if (cmd === "stackTrace") {
+                    return Promise.resolve({
+                        stackFrames: [{ id: 1, name: "main", line: 1, source: { path: "/a.ts" } }],
+                    });
+                }
+                if (cmd === "scopes") {
+                    return Promise.resolve({
+                        scopes: [{ name: "Locals", variablesReference: 100 }],
+                    });
+                }
+                if (cmd === "variables") {
+                    return Promise.resolve({ variables: manyVars });
+                }
+                return Promise.resolve({});
+            });
+            adapter.setBreakMode(session, 1);
+
+            const limits = { ...defaultDebugCaptureLimits, maxVariablesPerLevel: 2 };
+            const cappedAdapter = new VsCodeDebuggerAdapter(() => limits);
+            cappedAdapter.setBreakMode(session, 1);
+
+            const result = await cappedAdapter.readLocals(session, 0);
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value.some((v) => v.name.startsWith("… (+"))).toBe(true);
+            }
+        });
     });
 
     describe("readCallStack", () => {
         it("maps DAP stackFrames to StackFrameInfo[]", async () => {
             const session = createMockSession();
-            debug.activeDebugSession = session;
-            adapter.setBreakMode(1);
+            adapter.setBreakMode(session, 1);
 
-            const result = await adapter.readCallStack(20);
+            const result = await adapter.readCallStack(session, 20);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
@@ -208,12 +239,11 @@ describe("VsCodeDebuggerAdapter", () => {
                 ),
             ];
 
-            const result = await adapter.readBreakpoints();
+            const result = await adapter.readBreakpoints(mockSession);
 
             expect(result.ok).toBe(true);
             if (result.ok) {
                 expect(result.value).toHaveLength(2);
-                // VS Code is 0-based, output should be 1-based
                 expect(result.value[0]).toEqual({
                     filePath: "/src/app.ts",
                     line: 10,
@@ -226,6 +256,36 @@ describe("VsCodeDebuggerAdapter", () => {
                 expect(result.value[1].line).toBe(20);
                 expect(result.value[1].enabled).toBe(false);
                 expect(result.value[1].condition).toBe("");
+            }
+        });
+
+        it("prioritizes current file when over cap", async () => {
+            debug.breakpoints = [
+                new SourceBreakpoint(
+                    { uri: { fsPath: "/other.ts" }, range: { start: { line: 0, character: 0 } } },
+                    true
+                ),
+                new SourceBreakpoint(
+                    { uri: { fsPath: "/focus.ts" }, range: { start: { line: 4, character: 0 } } },
+                    true
+                ),
+                new SourceBreakpoint(
+                    { uri: { fsPath: "/c.ts" }, range: { start: { line: 1, character: 0 } } },
+                    true
+                ),
+                new SourceBreakpoint(
+                    { uri: { fsPath: "/d.ts" }, range: { start: { line: 2, character: 0 } } },
+                    true
+                ),
+            ];
+            const limits = { ...defaultDebugCaptureLimits, maxBreakpoints: 3 };
+            const a = new VsCodeDebuggerAdapter(() => limits);
+
+            const result = await a.readBreakpoints(mockSession, "/focus.ts");
+            expect(result.ok).toBe(true);
+            if (result.ok) {
+                expect(result.value[0].filePath).toBe("/focus.ts");
+                expect(result.value.some((b) => b.filePath === "(princiPal)")).toBe(true);
             }
         });
     });

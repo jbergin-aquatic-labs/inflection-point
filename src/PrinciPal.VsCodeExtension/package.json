@@ -34,6 +34,55 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically start the MCP server when a debug session begins."
+        },
+        "princiPal.capture.maxLocalDepth": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 6,
+          "description": "Max nesting depth when expanding local variables via DAP (lower reduces load on the debug adapter and MCP payload)."
+        },
+        "princiPal.capture.maxVariablesPerLevel": {
+          "type": "number",
+          "default": 200,
+          "minimum": 1,
+          "maximum": 2000,
+          "description": "Max variables requested per DAP variablesReference (caps huge scopes)."
+        },
+        "princiPal.capture.maxTotalLocalNodes": {
+          "type": "number",
+          "default": 1200,
+          "minimum": 10,
+          "maximum": 50000,
+          "description": "Hard cap on total local variable nodes collected across the tree (prevents runaway expansion)."
+        },
+        "princiPal.capture.maxValueLength": {
+          "type": "number",
+          "default": 4096,
+          "minimum": 128,
+          "maximum": 1000000,
+          "description": "Max characters per variable value string (very large strings are truncated)."
+        },
+        "princiPal.capture.maxStackFrames": {
+          "type": "number",
+          "default": 12,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "Max stack frames to send to the MCP server."
+        },
+        "princiPal.capture.maxBreakpoints": {
+          "type": "number",
+          "default": 150,
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "Max breakpoints listed per push (prioritizes the current file when over the cap)."
+        },
+        "princiPal.maxJsonPayloadChars": {
+          "type": "number",
+          "default": 1500000,
+          "minimum": 50000,
+          "maximum": 20000000,
+          "description": "If the JSON body exceeds this size, locals are replaced with a short notice before POST (last-resort guard)."
         }
       }
     }

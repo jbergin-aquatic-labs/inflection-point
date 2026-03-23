@@ -2,6 +2,7 @@ import { DebugEventCoordinator } from "../../../../src/PrinciPal.VsCodeExtension
 import type { IDebuggerReader } from "../../../../src/PrinciPal.VsCodeExtension/src/abstractions/IDebuggerReader";
 import type { IDebugStatePublisher } from "../../../../src/PrinciPal.VsCodeExtension/src/abstractions/IDebugStatePublisher";
 import type { IExtensionLogger } from "../../../../src/PrinciPal.VsCodeExtension/src/abstractions/IExtensionLogger";
+import type { DebugSession } from "vscode";
 import {
     success,
     failure,
@@ -13,25 +14,49 @@ import {
     type DebugState,
 } from "../../../../src/PrinciPal.VsCodeExtension/src/types";
 
+const mockSession = { id: "s1" } as DebugSession;
+
 function createMockReader(overrides: Partial<IDebuggerReader> = {}): IDebuggerReader {
     return {
-        isInBreakMode: false,
-        readCurrentLocation: jest.fn(async () => success<SourceLocation>({
-            filePath: "test.ts",
-            line: 10,
-            column: 5,
-            functionName: "main",
-            projectName: "TestProject",
-        })),
-        readLocals: jest.fn(async () => success<LocalVariable[]>([
-            { name: "x", value: "42", type: "number", isValidValue: true, members: [] },
-        ])),
-        readCallStack: jest.fn(async () => success<StackFrameInfo[]>([
-            { index: 0, functionName: "main", module: "app.ts", language: "", filePath: "test.ts", line: 10 },
-        ])),
-        readBreakpoints: jest.fn(async () => success<BreakpointInfo[]>([
-            { filePath: "test.ts", line: 10, column: 0, functionName: "", enabled: true, condition: "" },
-        ])),
+        isInBreakMode: jest.fn(() => false),
+        readCurrentLocation: jest.fn(async () =>
+            success<SourceLocation>({
+                filePath: "test.ts",
+                line: 10,
+                column: 5,
+                functionName: "main",
+                projectName: "TestProject",
+            })
+        ),
+        readLocals: jest.fn(async () =>
+            success<LocalVariable[]>([
+                { name: "x", value: "42", type: "number", isValidValue: true, members: [] },
+            ])
+        ),
+        readCallStack: jest.fn(async () =>
+            success<StackFrameInfo[]>([
+                {
+                    index: 0,
+                    functionName: "main",
+                    module: "app.ts",
+                    language: "",
+                    filePath: "test.ts",
+                    line: 10,
+                },
+            ])
+        ),
+        readBreakpoints: jest.fn(async () =>
+            success<BreakpointInfo[]>([
+                {
+                    filePath: "test.ts",
+                    line: 10,
+                    column: 0,
+                    functionName: "",
+                    enabled: true,
+                    condition: "",
+                },
+            ])
+        ),
         ...overrides,
     };
 }
@@ -58,29 +83,28 @@ function createMockLogger(): IExtensionLogger & { log: jest.Mock } {
 describe("DebugEventCoordinator", () => {
     describe("buildDebugState", () => {
         it("when not in break mode returns empty state", async () => {
-            const reader = createMockReader({ isInBreakMode: false });
+            const reader = createMockReader({ isInBreakMode: jest.fn(() => false) });
             const publisher = createMockPublisher();
             const logger = createMockLogger();
             const coordinator = new DebugEventCoordinator(reader, publisher, logger);
 
-            const state = await coordinator.buildDebugState();
+            const state = await coordinator.buildDebugState(mockSession);
 
             expect(state.isInBreakMode).toBe(false);
             expect(state.currentLocation).toBeNull();
             expect(state.locals).toEqual([]);
             expect(state.callStack).toEqual([]);
             expect(state.breakpoints).toEqual([]);
-            // Should not attempt to read anything
             expect(reader.readCurrentLocation).not.toHaveBeenCalled();
         });
 
         it("when in break mode populates all fields", async () => {
-            const reader = createMockReader({ isInBreakMode: true });
+            const reader = createMockReader({ isInBreakMode: jest.fn(() => true) });
             const publisher = createMockPublisher();
             const logger = createMockLogger();
             const coordinator = new DebugEventCoordinator(reader, publisher, logger);
 
-            const state = await coordinator.buildDebugState();
+            const state = await coordinator.buildDebugState(mockSession);
 
             expect(state.isInBreakMode).toBe(true);
             expect(state.currentLocation).toEqual({
@@ -94,35 +118,33 @@ describe("DebugEventCoordinator", () => {
             expect(state.locals[0].name).toBe("x");
             expect(state.callStack).toHaveLength(1);
             expect(state.breakpoints).toHaveLength(1);
+            expect(reader.readBreakpoints).toHaveBeenCalledWith(
+                mockSession,
+                "test.ts"
+            );
         });
 
         it("when reader fails returns partial state and logs errors", async () => {
             const reader = createMockReader({
-                isInBreakMode: true,
+                isInBreakMode: jest.fn(() => true),
                 readCurrentLocation: jest.fn(async () =>
-                    failure(new DebugReadError("currentLocation", "session lost"))),
-                readLocals: jest.fn(async () =>
-                    failure(new DebugReadError("locals", "timeout"))),
+                    failure(new DebugReadError("currentLocation", "session lost"))
+                ),
+                readLocals: jest.fn(async () => failure(new DebugReadError("locals", "timeout"))),
             });
             const publisher = createMockPublisher();
             const logger = createMockLogger();
             const coordinator = new DebugEventCoordinator(reader, publisher, logger);
 
-            const state = await coordinator.buildDebugState();
+            const state = await coordinator.buildDebugState(mockSession);
 
             expect(state.isInBreakMode).toBe(true);
             expect(state.currentLocation).toBeNull();
             expect(state.locals).toEqual([]);
-            // Successful reads still work
             expect(state.callStack).toHaveLength(1);
             expect(state.breakpoints).toHaveLength(1);
-            // Errors were logged
-            expect(logger.log).toHaveBeenCalledWith(
-                expect.stringContaining("currentLocation")
-            );
-            expect(logger.log).toHaveBeenCalledWith(
-                expect.stringContaining("locals")
-            );
+            expect(logger.log).toHaveBeenCalledWith(expect.stringContaining("currentLocation"));
+            expect(logger.log).toHaveBeenCalledWith(expect.stringContaining("locals"));
         });
     });
 

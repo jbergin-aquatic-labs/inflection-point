@@ -6,6 +6,7 @@ import { HttpDebugStatePublisher } from "./adapters/HttpDebugStatePublisher.js";
 import { DebugEventCoordinator } from "./services/DebugEventCoordinator.js";
 import { DebugAdapterTrackerFactory } from "./services/DebugAdapterTrackerFactory.js";
 import { ServerProcessManager } from "./services/ServerProcessManager.js";
+import { loadDebugCaptureLimits } from "./debugCaptureLimits.js";
 
 let logger: OutputLogger | undefined;
 let publisher: HttpDebugStatePublisher | undefined;
@@ -62,13 +63,20 @@ export async function activate(
         );
     }
 
-    // Create the adapter, publisher, coordinator
-    const adapter = new VsCodeDebuggerAdapter();
+    const getCaptureLimits = () =>
+        loadDebugCaptureLimits(vscode.workspace.getConfiguration("princiPal"));
+
+    const adapter = new VsCodeDebuggerAdapter(getCaptureLimits);
     publisher = new HttpDebugStatePublisher(
         port,
         sessionId,
         sessionName,
-        workspacePath
+        workspacePath,
+        undefined,
+        5000,
+        500,
+        30_000,
+        () => getCaptureLimits().maxJsonPayloadChars
     );
     coordinator = new DebugEventCoordinator(adapter, publisher, logger);
 

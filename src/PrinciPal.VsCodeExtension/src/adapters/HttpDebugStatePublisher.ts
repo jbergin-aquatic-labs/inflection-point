@@ -4,6 +4,8 @@ import { success, failure, ServerUnreachableError, RequestTimedOutError } from "
 
 export type FetchFunction = (url: string, init?: RequestInit) => Promise<Response>;
 
+export type MaxPayloadCharsSource = () => number;
+
 /**
  * Posts debug state to the MCP server over HTTP.
  * Direct port of C# HttpDebugStatePublisher — same endpoints, same JSON format.
@@ -16,6 +18,7 @@ export class HttpDebugStatePublisher implements IDebugStatePublisher {
     private readonly _timeoutMs: number;
     private readonly _retryBaseDelayMs: number;
     private readonly _heartbeatIntervalMs: number;
+    private readonly _getMaxPayloadChars: MaxPayloadCharsSource;
     private _abortController: AbortController | null = null;
     private _heartbeatHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -27,7 +30,8 @@ export class HttpDebugStatePublisher implements IDebugStatePublisher {
         fetchFn?: FetchFunction,
         timeoutMs: number = 5000,
         retryBaseDelayMs: number = 500,
-        heartbeatIntervalMs: number = 30_000
+        heartbeatIntervalMs: number = 30_000,
+        getMaxPayloadChars?: MaxPayloadCharsSource
     ) {
         this._sessionId = sessionId;
         this._sessionQueryParams = `name=${encodeURIComponent(sessionName)}&path=${encodeURIComponent(workspacePath)}`;
@@ -36,6 +40,7 @@ export class HttpDebugStatePublisher implements IDebugStatePublisher {
         this._timeoutMs = timeoutMs;
         this._retryBaseDelayMs = retryBaseDelayMs;
         this._heartbeatIntervalMs = heartbeatIntervalMs;
+        this._getMaxPayloadChars = getMaxPayloadChars ?? (() => 1_500_000);
     }
 
     startHeartbeat(): void {
@@ -63,7 +68,9 @@ export class HttpDebugStatePublisher implements IDebugStatePublisher {
     }
 
     async pushDebugState(state: DebugState): Promise<Result> {
-        const body = JSON.stringify(state);
+        const maxChars = this._getMaxPayloadChars();
+        const payload = shrinkDebugStateIfNeeded(state, maxChars);
+        const body = JSON.stringify(payload);
         return this.send("Push", () =>
             this.doFetch(
                 `${this._serverUrl}/api/sessions/${encodeURIComponent(this._sessionId)}/debug-state?${this._sessionQueryParams}`,
@@ -149,4 +156,51 @@ function computeDelay(attempt: number, baseDelayMs: number): number {
 
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Keeps JSON body under maxChars to avoid huge POST bodies and server/memory pressure.
+ */
+export function shrinkDebugStateIfNeeded(state: DebugState, maxChars: number): DebugState {
+    let candidate = state;
+    let serialized = JSON.stringify(candidate);
+    if (serialized.length <= maxChars) {
+        return candidate;
+    }
+
+    candidate = {
+        ...state,
+        locals: [
+            {
+                name: "[princiPal]",
+                value:
+                    "Debug state JSON exceeded princiPal.maxJsonPayloadChars; locals replaced. Lower princiPal.capture.* limits or increase maxJsonPayloadChars.",
+                type: "notice",
+                isValidValue: true,
+                members: [],
+            },
+        ],
+        callStack: state.callStack.slice(0, 8),
+        breakpoints: state.breakpoints.slice(0, 40),
+    };
+    serialized = JSON.stringify(candidate);
+    if (serialized.length <= maxChars) {
+        return candidate;
+    }
+
+    return {
+        isInBreakMode: state.isInBreakMode,
+        currentLocation: state.currentLocation,
+        locals: [
+            {
+                name: "[princiPal]",
+                value: "Payload still exceeds limit after emergency shrink.",
+                type: "notice",
+                isValidValue: true,
+                members: [],
+            },
+        ],
+        callStack: [],
+        breakpoints: [],
+    };
 }

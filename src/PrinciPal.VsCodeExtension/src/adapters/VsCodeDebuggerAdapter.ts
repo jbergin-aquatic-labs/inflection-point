@@ -8,39 +8,52 @@ import type {
     BreakpointInfo,
 } from "../types.js";
 import { success, failure, DebugReadError } from "../types.js";
+import {
+    type DebugCaptureLimits,
+    defaultDebugCaptureLimits,
+    truncateVariableValue,
+    pathsEqualForBreakpointHint,
+} from "../debugCaptureLimits.js";
+
+type GetLimits = () => DebugCaptureLimits;
 
 /**
  * Reads debug state via the VS Code Debug Adapter Protocol (DAP).
- * Equivalent of the C# VsDebuggerAdapter that uses DTE2/COM.
+ * Break state and thread id are tracked per debug session to avoid cross-session races.
  */
 export class VsCodeDebuggerAdapter implements IDebuggerReader {
-    private _isInBreakMode = false;
-    private _stoppedThreadId: number | undefined;
+    private readonly _breakBySession = new Map<string, { threadId: number }>();
+    private readonly _getLimits: GetLimits;
 
-    get isInBreakMode(): boolean {
-        return this._isInBreakMode;
+    constructor(getLimits?: GetLimits) {
+        this._getLimits = getLimits ?? (() => defaultDebugCaptureLimits);
     }
 
-    /** Called by the DebugAdapterTracker when a `stopped` event arrives. */
-    setBreakMode(threadId: number): void {
-        this._isInBreakMode = true;
-        this._stoppedThreadId = threadId;
+    /** Called when a `stopped` DAP event is received for this session. */
+    setBreakMode(session: vscode.DebugSession, threadId: number): void {
+        this._breakBySession.set(session.id, { threadId });
     }
 
-    /** Called by the DebugAdapterTracker when a `continued` event arrives or session ends. */
-    clearBreakMode(): void {
-        this._isInBreakMode = false;
-        this._stoppedThreadId = undefined;
+    /** Called on `continued` or session end for this session. */
+    clearBreakMode(session: vscode.DebugSession): void {
+        this._breakBySession.delete(session.id);
     }
 
-    async readCurrentLocation(): Promise<Result<SourceLocation>> {
+    isInBreakMode(session: vscode.DebugSession): boolean {
+        return this._breakBySession.has(session.id);
+    }
+
+    private threadIdFor(session: vscode.DebugSession): number {
+        return this._breakBySession.get(session.id)?.threadId ?? 1;
+    }
+
+    private limits(): DebugCaptureLimits {
+        return this._getLimits();
+    }
+
+    async readCurrentLocation(session: vscode.DebugSession): Promise<Result<SourceLocation>> {
         try {
-            const session = vscode.debug.activeDebugSession;
-            if (!session) {
-                return failure(new DebugReadError("currentLocation", "No active debug session."));
-            }
-
-            const threadId = this._stoppedThreadId ?? 1;
+            const threadId = this.threadIdFor(session);
             const response = await session.customRequest("stackTrace", {
                 threadId,
                 startFrame: 0,
@@ -65,14 +78,11 @@ export class VsCodeDebuggerAdapter implements IDebuggerReader {
         }
     }
 
-    async readLocals(maxDepth: number = 2): Promise<Result<LocalVariable[]>> {
+    async readLocals(session: vscode.DebugSession, maxDepth?: number): Promise<Result<LocalVariable[]>> {
+        const lim = this.limits();
+        const depth = maxDepth ?? lim.maxLocalDepth;
         try {
-            const session = vscode.debug.activeDebugSession;
-            if (!session) {
-                return failure(new DebugReadError("locals", "No active debug session."));
-            }
-
-            const threadId = this._stoppedThreadId ?? 1;
+            const threadId = this.threadIdFor(session);
             const stackResp = await session.customRequest("stackTrace", {
                 threadId,
                 startFrame: 0,
@@ -89,19 +99,21 @@ export class VsCodeDebuggerAdapter implements IDebuggerReader {
             });
 
             const scopes = scopesResp.scopes as DapScope[];
-            const localsScope = scopes.find(
-                (s) => s.name === "Locals" || s.name === "Local"
-            ) ?? scopes[0];
+            const localsScope =
+                scopes.find((s) => s.name === "Locals" || s.name === "Local") ?? scopes[0];
 
             if (!localsScope) {
                 return success<LocalVariable[]>([]);
             }
 
+            const counters = { totalNodes: 0 };
             const variables = await this.expandVariables(
                 session,
                 localsScope.variablesReference,
-                maxDepth,
-                0
+                depth,
+                0,
+                counters,
+                lim
             );
 
             return success(variables);
@@ -114,50 +126,77 @@ export class VsCodeDebuggerAdapter implements IDebuggerReader {
         session: vscode.DebugSession,
         variablesReference: number,
         maxDepth: number,
-        currentDepth: number
+        currentDepth: number,
+        counters: { totalNodes: number },
+        limits: DebugCaptureLimits
     ): Promise<LocalVariable[]> {
+        if (counters.totalNodes >= limits.maxTotalLocalNodes) {
+            return [];
+        }
+
         const resp = await session.customRequest("variables", {
             variablesReference,
         });
 
-        const dapVars = resp.variables as DapVariable[];
+        const dapVars = (resp.variables as DapVariable[]) ?? [];
+        const slice = dapVars.slice(0, limits.maxVariablesPerLevel);
+        const skipped = dapVars.length - slice.length;
+
         const result: LocalVariable[] = [];
 
-        for (const v of dapVars) {
-            const members: LocalVariable[] =
-                v.variablesReference > 0 && currentDepth < maxDepth
-                    ? await this.expandVariables(
-                          session,
-                          v.variablesReference,
-                          maxDepth,
-                          currentDepth + 1
-                      )
-                    : [];
+        for (const v of slice) {
+            if (counters.totalNodes >= limits.maxTotalLocalNodes) {
+                break;
+            }
+            counters.totalNodes++;
+
+            const truncatedValue = truncateVariableValue(v.value ?? "", limits.maxValueLength);
+            let members: LocalVariable[] = [];
+            if (v.variablesReference > 0 && currentDepth < maxDepth) {
+                members = await this.expandVariables(
+                    session,
+                    v.variablesReference,
+                    maxDepth,
+                    currentDepth + 1,
+                    counters,
+                    limits
+                );
+            }
 
             result.push({
                 name: v.name,
-                value: v.value,
+                value: truncatedValue,
                 type: v.type ?? "",
                 isValidValue: true,
                 members,
             });
         }
 
+        if (skipped > 0) {
+            result.push({
+                name: `… (+${skipped} more at this level)`,
+                value: "",
+                type: "princiPal.capped",
+                isValidValue: true,
+                members: [],
+            });
+        }
+
         return result;
     }
 
-    async readCallStack(maxFrames: number = 20): Promise<Result<StackFrameInfo[]>> {
+    async readCallStack(
+        session: vscode.DebugSession,
+        maxFrames?: number
+    ): Promise<Result<StackFrameInfo[]>> {
+        const lim = this.limits();
+        const levels = maxFrames ?? lim.maxStackFrames;
         try {
-            const session = vscode.debug.activeDebugSession;
-            if (!session) {
-                return failure(new DebugReadError("callStack", "No active debug session."));
-            }
-
-            const threadId = this._stoppedThreadId ?? 1;
+            const threadId = this.threadIdFor(session);
             const response = await session.customRequest("stackTrace", {
                 threadId,
                 startFrame: 0,
-                levels: maxFrames,
+                levels,
             });
 
             const frames = response.stackFrames as DapStackFrame[];
@@ -176,7 +215,11 @@ export class VsCodeDebuggerAdapter implements IDebuggerReader {
         }
     }
 
-    async readBreakpoints(): Promise<Result<BreakpointInfo[]>> {
+    async readBreakpoints(
+        _session: vscode.DebugSession,
+        currentFileHint?: string | null
+    ): Promise<Result<BreakpointInfo[]>> {
+        const max = this.limits().maxBreakpoints;
         try {
             const bps = vscode.debug.breakpoints;
             const result: BreakpointInfo[] = [];
@@ -185,7 +228,7 @@ export class VsCodeDebuggerAdapter implements IDebuggerReader {
                 if (isSourceBreakpoint(bp)) {
                     result.push({
                         filePath: bp.location.uri.fsPath,
-                        line: bp.location.range.start.line + 1, // VS Code is 0-based, C# is 1-based
+                        line: bp.location.range.start.line + 1,
                         column: bp.location.range.start.character + 1,
                         functionName: "",
                         enabled: bp.enabled,
@@ -194,19 +237,41 @@ export class VsCodeDebuggerAdapter implements IDebuggerReader {
                 }
             }
 
-            return success(result);
+            if (result.length <= max) {
+                return success(result);
+            }
+
+            const hint = currentFileHint?.trim() ?? "";
+            const prioritized =
+                hint.length > 0
+                    ? [
+                          ...result.filter((b) => pathsEqualForBreakpointHint(b.filePath, hint)),
+                          ...result.filter((b) => !pathsEqualForBreakpointHint(b.filePath, hint)),
+                      ]
+                    : result;
+
+            const keptForReal = Math.max(0, max - 1);
+            const capped = prioritized.slice(0, keptForReal);
+            const omitted = result.length - capped.length;
+            capped.push({
+                filePath: "(princiPal)",
+                line: 0,
+                column: 0,
+                functionName: `+${omitted} breakpoints omitted`,
+                enabled: false,
+                condition: "Raise princiPal.capture.maxBreakpoints to send more.",
+            });
+
+            return success(capped);
         } catch (e) {
             return failure(new DebugReadError("breakpoints", String(e)));
         }
     }
 }
 
-/** Duck-type check for SourceBreakpoint — avoids instanceof issues across module boundaries. */
 function isSourceBreakpoint(bp: vscode.Breakpoint): bp is vscode.SourceBreakpoint {
     return "location" in bp;
 }
-
-// DAP protocol types (subset we need)
 
 interface DapStackFrame {
     id: number;

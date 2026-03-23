@@ -6,8 +6,6 @@ import type { IExtensionLogger } from "../abstractions/IExtensionLogger.js";
 /**
  * Creates a PrinciPalDebugTracker per debug session.
  * Registered via vscode.debug.registerDebugAdapterTrackerFactory('*', factory).
- *
- * Replaces the C# DebuggerEventHandler that subscribes to COM events.
  */
 export class DebugAdapterTrackerFactory
     implements vscode.DebugAdapterTrackerFactory
@@ -27,9 +25,10 @@ export class DebugAdapterTrackerFactory
     }
 
     createDebugAdapterTracker(
-        _session: vscode.DebugSession
+        session: vscode.DebugSession
     ): vscode.ProviderResult<vscode.DebugAdapterTracker> {
         return new PrinciPalDebugTracker(
+            session,
             this._adapter,
             this._coordinator,
             this._logger
@@ -39,45 +38,62 @@ export class DebugAdapterTrackerFactory
 
 /**
  * Intercepts DAP messages to detect break mode transitions.
- * Equivalent of the COM DebuggerEvents subscriptions in the VS extension.
+ * Coalesces overlapping `stopped` handlers so rapid breakpoints do not stack unbounded async work.
  */
 class PrinciPalDebugTracker implements vscode.DebugAdapterTracker {
+    private _pushGeneration = 0;
+
+    private readonly _session: vscode.DebugSession;
     private readonly _adapter: VsCodeDebuggerAdapter;
     private readonly _coordinator: DebugEventCoordinator;
     private readonly _logger: IExtensionLogger;
 
     constructor(
+        session: vscode.DebugSession,
         adapter: VsCodeDebuggerAdapter,
         coordinator: DebugEventCoordinator,
         logger: IExtensionLogger
     ) {
+        this._session = session;
         this._adapter = adapter;
         this._coordinator = coordinator;
         this._logger = logger;
     }
 
-    /** Intercepts DAP messages from the debug adapter to VS Code. */
     onDidSendMessage(message: DapMessage): void {
         if (message.type !== "event") return;
 
         if (message.event === "stopped") {
             const threadId = (message.body as { threadId?: number })?.threadId ?? 1;
-            this._adapter.setBreakMode(threadId);
-            void this.buildAndPush();
+            this._adapter.setBreakMode(this._session, threadId);
+            this.invalidateInFlightPushes();
+            const generation = this._pushGeneration;
+            void this.buildAndPush(generation);
         } else if (message.event === "continued") {
-            this._adapter.clearBreakMode();
+            this.invalidateInFlightPushes();
+            this._adapter.clearBreakMode(this._session);
         }
     }
 
-    /** Session is ending — clear state. */
     onWillStopSession(): void {
-        this._adapter.clearBreakMode();
+        this.invalidateInFlightPushes();
+        this._adapter.clearBreakMode(this._session);
         void this.clear();
     }
 
-    private async buildAndPush(): Promise<void> {
+    private invalidateInFlightPushes(): void {
+        this._pushGeneration++;
+    }
+
+    private async buildAndPush(capturedGeneration: number): Promise<void> {
         try {
-            const state = await this._coordinator.buildDebugState();
+            const state = await this._coordinator.buildDebugState(this._session);
+            if (capturedGeneration !== this._pushGeneration) {
+                return;
+            }
+            if (!this._adapter.isInBreakMode(this._session)) {
+                return;
+            }
             const result = await this._coordinator.publishState(state);
             if (!result.ok) {
                 this._logger.log(result.error.description);

@@ -1,4 +1,8 @@
-import { HttpDebugStatePublisher, type FetchFunction } from "../../../../src/PrinciPal.VsCodeExtension/src/adapters/HttpDebugStatePublisher";
+import {
+    HttpDebugStatePublisher,
+    shrinkDebugStateIfNeeded,
+    type FetchFunction,
+} from "../../../../src/PrinciPal.VsCodeExtension/src/adapters/HttpDebugStatePublisher";
 import type { DebugState } from "../../../../src/PrinciPal.VsCodeExtension/src/types";
 import { ServerUnreachableError, RequestTimedOutError } from "../../../../src/PrinciPal.VsCodeExtension/src/types";
 
@@ -37,6 +41,20 @@ const SESSION_ID = "abc12345";
 const SESSION_NAME = "TestProject";
 const WORKSPACE_PATH = "/workspace/test";
 const PORT = 9229;
+
+describe("shrinkDebugStateIfNeeded", () => {
+    it("returns original state when under limit", () => {
+        const state: DebugState = {
+            isInBreakMode: true,
+            currentLocation: null,
+            locals: [{ name: "a", value: "1", type: "n", isValidValue: true, members: [] }],
+            callStack: [],
+            breakpoints: [],
+        };
+        const out = shrinkDebugStateIfNeeded(state, 10_000);
+        expect(out).toBe(state);
+    });
+});
 
 describe("HttpDebugStatePublisher", () => {
     describe("registerSession", () => {
@@ -93,6 +111,42 @@ describe("HttpDebugStatePublisher", () => {
             expect(body.isInBreakMode).toBe(true);
             expect(body.currentLocation.filePath).toBe("test.ts");
             expect(body.locals[0].name).toBe("x");
+        });
+
+        it("replaces locals when JSON exceeds maxJsonPayloadChars", async () => {
+            const { fetch, captured } = createMockFetch();
+            const publisher = new HttpDebugStatePublisher(
+                PORT,
+                SESSION_ID,
+                SESSION_NAME,
+                WORKSPACE_PATH,
+                fetch,
+                5000,
+                0,
+                30_000,
+                () => 800
+            );
+
+            const big = "z".repeat(2000);
+            const state: DebugState = {
+                isInBreakMode: true,
+                currentLocation: {
+                    filePath: "test.ts",
+                    line: 10,
+                    column: 5,
+                    functionName: "main",
+                    projectName: "TestProject",
+                },
+                locals: [{ name: "blob", value: big, type: "string", isValidValue: true, members: [] }],
+                callStack: [],
+                breakpoints: [],
+            };
+
+            await publisher.pushDebugState(state);
+
+            const body = JSON.parse(captured[0].init?.body as string);
+            expect(body.locals[0].name).toBe("[princiPal]");
+            expect(JSON.stringify(body).length).toBeLessThanOrEqual(800);
         });
     });
 

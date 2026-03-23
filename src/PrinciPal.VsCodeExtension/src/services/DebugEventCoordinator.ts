@@ -1,3 +1,4 @@
+import type { DebugSession } from "vscode";
 import type { IDebuggerReader } from "../abstractions/IDebuggerReader.js";
 import type { IDebugStatePublisher } from "../abstractions/IDebugStatePublisher.js";
 import type { IExtensionLogger } from "../abstractions/IExtensionLogger.js";
@@ -6,7 +7,7 @@ import { emptyDebugState } from "../types.js";
 
 /**
  * Testable orchestration layer — direct port of C# DebugEventCoordinator.
- * Depends only on interfaces, no VS Code API imports.
+ * Depends only on interfaces, no VS Code API imports except DebugSession typing.
  */
 export class DebugEventCoordinator {
     private readonly _reader: IDebuggerReader;
@@ -24,40 +25,42 @@ export class DebugEventCoordinator {
     }
 
     /**
-     * Reads all debug state sections from the debugger.
+     * Reads all debug state sections from the debugger for the given session.
      * Returns partially-populated DebugState if some sections fail.
+     * Location is read before breakpoints so breakpoint capping can prefer the current file.
      */
-    async buildDebugState(): Promise<DebugState> {
-        const state = emptyDebugState(this._reader.isInBreakMode);
+    async buildDebugState(session: DebugSession): Promise<DebugState> {
+        const state = emptyDebugState(this._reader.isInBreakMode(session));
 
         if (!state.isInBreakMode) return state;
 
-        const locationResult = await this._reader.readCurrentLocation();
+        const locationResult = await this._reader.readCurrentLocation(session);
         if (locationResult.ok) {
             state.currentLocation = locationResult.value;
         } else {
             this._logger.log(locationResult.error.description);
         }
 
-        const localsResult = await this._reader.readLocals();
+        const currentPath = state.currentLocation?.filePath ?? null;
+        const breakpointsResult = await this._reader.readBreakpoints(session, currentPath);
+        if (breakpointsResult.ok) {
+            state.breakpoints = breakpointsResult.value;
+        } else {
+            this._logger.log(breakpointsResult.error.description);
+        }
+
+        const localsResult = await this._reader.readLocals(session);
         if (localsResult.ok) {
             state.locals = localsResult.value;
         } else {
             this._logger.log(localsResult.error.description);
         }
 
-        const callStackResult = await this._reader.readCallStack();
+        const callStackResult = await this._reader.readCallStack(session);
         if (callStackResult.ok) {
             state.callStack = callStackResult.value;
         } else {
             this._logger.log(callStackResult.error.description);
-        }
-
-        const breakpointsResult = await this._reader.readBreakpoints();
-        if (breakpointsResult.ok) {
-            state.breakpoints = breakpointsResult.value;
-        } else {
-            this._logger.log(breakpointsResult.error.description);
         }
 
         return state;
