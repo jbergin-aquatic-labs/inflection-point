@@ -192,13 +192,15 @@
     "vscode:prepublish": "npm run bundle -- --production",
     "vsix": "vsce package --no-dependencies -o inflection-point.vsix",
     "package": "npm run vsix",
-    "test": "echo \"no unit tests in-tree yet\""
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.27.4",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.1"
   }
 }
