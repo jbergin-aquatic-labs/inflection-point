@@ -32,14 +32,18 @@ export class vscode_debugger_adapter implements i_debugger_reader {
     }
 
     /**
-     * Some adapters omit threadId on stopped events; a wrong hint (e.g. default 1) yields empty stack reads.
+     * When the debug adapter tracker misses DAP "stopped", VS Code still exposes the focused thread/frame
+     * in the Call Stack UI (works for debugpy, cppdbg, js-debug, etc.).
      */
-    async resolve_stopped_thread_id(session: vscode.DebugSession, hint?: number): Promise<number> {
-        const hint_ok =
-            hint !== undefined && hint !== null && !Number.isNaN(hint)
-                ? await this.thread_has_stack_frames(session, hint)
-                : false;
-        if (hint_ok) return hint as number;
+    async try_refresh_pause_from_ui_state(session: vscode.DebugSession): Promise<number | undefined> {
+        const item = vscode.debug.activeStackItem;
+        if (!item) return undefined;
+        if (item.session.id !== session.id) return undefined;
+        this.set_break_mode(session, item.threadId);
+        return item.threadId;
+    }
+
+    async probe_paused_thread_id(session: vscode.DebugSession): Promise<number | undefined> {
         try {
             const r = await session.customRequest("threads", {});
             const threads = (r.threads as { id: number }[]) ?? [];
@@ -47,8 +51,20 @@ export class vscode_debugger_adapter implements i_debugger_reader {
                 if (await this.thread_has_stack_frames(session, t.id)) return t.id;
             }
         } catch {
-            /* fall through */
+            /* ignore */
         }
+        return undefined;
+    }
+
+    /**
+     * Some adapters omit threadId on stopped events; a wrong hint (e.g. default 1) yields empty stack reads.
+     */
+    async resolve_stopped_thread_id(session: vscode.DebugSession, hint?: number): Promise<number> {
+        if (hint !== undefined && hint !== null && !Number.isNaN(hint)) {
+            if (await this.thread_has_stack_frames(session, hint)) return hint;
+        }
+        const scanned = await this.probe_paused_thread_id(session);
+        if (scanned !== undefined) return scanned;
         return hint !== undefined && hint !== null && !Number.isNaN(hint) ? hint : 1;
     }
 
@@ -232,6 +248,15 @@ export class vscode_debugger_adapter implements i_debugger_reader {
                         enabled: bp.enabled,
                         condition: bp.condition ?? "",
                     });
+                } else if (is_function_breakpoint(bp)) {
+                    result.push({
+                        file_path: "(function_breakpoint)",
+                        line: 0,
+                        column: 0,
+                        function_name: bp.functionName,
+                        enabled: bp.enabled,
+                        condition: bp.condition ?? "",
+                    });
                 }
             }
             if (result.length <= max) return success(result);
@@ -265,6 +290,10 @@ export class vscode_debugger_adapter implements i_debugger_reader {
 
 function is_source_breakpoint(bp: vscode.Breakpoint): bp is vscode.SourceBreakpoint {
     return "location" in bp;
+}
+
+function is_function_breakpoint(bp: vscode.Breakpoint): bp is vscode.FunctionBreakpoint {
+    return "functionName" in bp;
 }
 
 interface dap_stack_frame {

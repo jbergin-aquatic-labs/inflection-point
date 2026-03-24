@@ -35,6 +35,13 @@
           "default": false,
           "description": "Log debug adapter protocol event types to the Inflection Point output channel (troubleshooting)."
         },
+        "inflection_point.debug_pause_poll_interval_ms": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 0,
+          "maximum": 60000,
+          "description": "While debugging, poll the adapter for a paused thread this often (ms) as a fallback when DAP events are missed. Set to 0 to disable."
+        },
         "inflection_point.capture.max_local_depth": {
           "type": "number",
           "default": 2,
