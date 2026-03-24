@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { i_extension_logger } from "../abstractions/i_extension_logger";
@@ -14,7 +15,7 @@ interface resolved_start_info {
 }
 
 /**
- * Starts the TypeScript MCP server (Node). Release builds may ship server/principal_mcp_server.cjs.
+ * Starts the TypeScript MCP server (Node). Release builds ship server/inflection_point_mcp_server.cjs.
  */
 export class server_process_manager {
     private readonly logger: i_extension_logger;
@@ -67,26 +68,38 @@ export class server_process_manager {
     }
 
     private start_process(info: resolved_start_info): void {
+        const log_path = server_process_manager.get_log_path(this.port);
+        fs.mkdirSync(path.dirname(log_path), { recursive: true });
+        // Truncate log on each start so it doesn't grow unbounded.
+        fs.writeFileSync(log_path, `--- MCP server started ${new Date().toISOString()} ---\n`);
+        const log_fd = fs.openSync(log_path, "a");
+
         this.logger.log(`starting MCP server: ${info.command} ${info.args.join(" ")} (cwd ${info.cwd})`);
+        this.logger.log(`server log: ${log_path}`);
         this.process = spawn(info.command, info.args, {
-            stdio: ["ignore", "pipe", "pipe"],
+            // Redirect stdout+stderr to the persistent log file so output survives extension reloads.
+            stdio: ["ignore", log_fd, log_fd],
             detached: true,
             cwd: info.cwd,
         });
-        this.process.stdout?.on("data", (data: Buffer) => {
-            this.logger.log(data.toString().trimEnd());
+        this.process.on("exit", (code) => {
+            try { fs.closeSync(log_fd); } catch { /* ignore */ }
+            this.on_process_exited(code);
         });
-        this.process.stderr?.on("data", (data: Buffer) => {
-            this.logger.log(`[stderr] ${data.toString().trimEnd()}`);
-        });
-        this.process.on("exit", (code) => this.on_process_exited(code));
         this.process.unref();
         this.logger.log(`MCP server started (PID ${this.process.pid}) on http://127.0.0.1:${this.port}/`);
     }
 
+    static get_log_path(port: number): string {
+        const base = process.platform === "win32"
+            ? process.env.LOCALAPPDATA ?? os.tmpdir()
+            : process.env.HOME ?? os.tmpdir();
+        return path.join(base, ".inflection_point", `server-${port}.log`);
+    }
+
     private resolve_start_info(): result<resolved_start_info> {
         const port_args = ["--port", String(this.port)];
-        const bundled = path.join(this.extension_dir, "server", "principal_mcp_server.cjs");
+        const bundled = path.join(this.extension_dir, "server", "inflection_point_mcp_server.cjs");
         if (fs.existsSync(bundled)) {
             this.logger.log(`using bundled server: ${bundled}`);
             return success({
@@ -128,6 +141,32 @@ export class server_process_manager {
         this.logger.log(`MCP server crashed (exit ${code}); restarting (${this.restart_count}/${max_restarts})...`);
         const info = this.resolve_start_info();
         if (info.ok) this.start_process(info.value);
+    }
+
+    async stop(): Promise<void> {
+        const pid = this.process?.pid ?? server_lock_file.read_lock_pid(this.port);
+        if (pid !== undefined) {
+            this.logger.log(`stopping MCP server (PID ${pid})...`);
+            try {
+                process.kill(pid, "SIGTERM");
+            } catch {
+                /* already dead */
+            }
+        }
+        this.process = null;
+        server_lock_file.remove(this.port);
+        this.logger.log("MCP server stopped.");
+    }
+
+    async restart(port?: number): Promise<void> {
+        const p = port ?? this.port;
+        await this.stop();
+        this.disposed = false;
+        await this.start(p);
+    }
+
+    get running_pid(): number | undefined {
+        return this.process?.pid ?? server_lock_file.read_lock_pid(this.port);
     }
 
     static async is_server_running(port: number, timeout_ms: number): Promise<boolean> {

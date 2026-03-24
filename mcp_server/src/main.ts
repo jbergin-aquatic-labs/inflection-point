@@ -1,3 +1,4 @@
+import type { Server } from "node:http";
 import { create_app } from "./http_app.js";
 import { session_manager } from "./session_manager.js";
 import { debug_query_service } from "./debug_query_service.js";
@@ -12,22 +13,27 @@ function parse_port(args: string[], default_port = 9229): number {
     return default_port;
 }
 
-const idle_initial_ms = 300_000;
-const idle_grace_ms = 30_000;
 const reaper_interval_ms = 30_000;
 const session_stale_ms = 90_000;
 
-type watchdog_phase = "waiting_for_first_session" | "active" | "grace_period";
+/**
+ * Optional Quartz-style shutdown (legacy). **Off by default** so Cursor MCP stays up:
+ * MCP traffic does not register "sessions" — only the VS Code extension does via /api/sessions.
+ * Auto-exit after grace caused 127.0.0.1:9229 ECONNREFUSED when the extension deregistered or
+ * heartbeats paused briefly.
+ *
+ * Set INFLECTION_POINT_EXIT_ON_IDLE=1 to enable:
+ * - 5 min with zero extension sessions → exit
+ * - after any session existed: zero sessions for 30s grace → exit
+ */
+function maybe_start_idle_shutdown_watchdog(server: Server, sessions: session_manager): void {
+    if (process.env.INFLECTION_POINT_EXIT_ON_IDLE !== "1") {
+        return;
+    }
 
-function main(): void {
-    const port = parse_port(process.argv);
-    const sessions = new session_manager();
-    const query = new debug_query_service(sessions);
-    const app = create_app(sessions, query);
-
-    const server = app.listen(port, "127.0.0.1", () => {
-        console.error(`principal_mcp_server listening on http://127.0.0.1:${port}/ (MCP POST /mcp)`);
-    });
+    const idle_initial_ms = 300_000;
+    const idle_grace_ms = 30_000;
+    type watchdog_phase = "waiting_for_first_session" | "active" | "grace_period";
 
     let phase: watchdog_phase = "waiting_for_first_session";
     const started_at = Date.now();
@@ -61,6 +67,21 @@ function main(): void {
             }
         }
     }, 10_000);
+}
+
+function main(): void {
+    const port = parse_port(process.argv);
+    const sessions = new session_manager();
+    const query = new debug_query_service(sessions);
+    const app = create_app(sessions, query);
+
+    const server = app.listen(port, "127.0.0.1", () => {
+        console.error(
+            `inflection_point_mcp_server listening on http://127.0.0.1:${port}/ (MCP streamable HTTP: GET/POST / or /mcp)`
+        );
+    });
+
+    maybe_start_idle_shutdown_watchdog(server, sessions);
 
     setInterval(() => {
         for (const id of sessions.get_stale_session_ids(session_stale_ms)) {

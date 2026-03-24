@@ -7,4 +7,4 @@ dist/
 .DS_Store
 
 # Bundled MCP server artifact (regenerate with npm run build)
-vscode_extension/server/principal_mcp_server.cjs
+vscode_extension/server/inflection_point_mcp_server.cjs

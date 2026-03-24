@@ -1,73 +1,187 @@
 {
-  "name": "principal_vscode",
-  "displayName": "princiPal",
-  "description": "Bridges VS Code/Cursor debugger state to MCP-compatible AI editors for AI-assisted debugging.",
+  "name": "inflection-point-vscode",
+  "displayName": "Inflection Point",
+  "description": "Bridge VS Code/Cursor debugger state to MCP so chat models can read stack, locals, and breakpoints.",
   "version": "1.0.0",
-  "publisher": "principal",
+  "publisher": "inflection-point",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jbergin-aquatic-labs/inflection-point.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": ["Debuggers"],
-  "keywords": ["debugger", "AI", "MCP", "Claude", "Cursor"],
+  "keywords": ["debugger", "AI", "MCP", "Cursor"],
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension_entry.js",
   "contributes": {
     "configuration": {
-      "title": "principal",
+      "title": "Inflection Point",
       "properties": {
-        "principal.port": {
+        "inflection_point.port": {
           "type": "number",
           "default": 9229,
-          "description": "Port for the MCP server."
+          "description": "Port for the MCP + REST server."
         },
-        "principal.auto_start": {
+        "inflection_point.auto_start": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically start the MCP server when the extension activates."
+          "description": "Start the MCP server when the extension activates (if not already running)."
         },
-        "principal.capture.max_local_depth": {
+        "inflection_point.trace_dap": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log debug adapter protocol event types to the Inflection Point output channel (troubleshooting)."
+        },
+        "inflection_point.debug_pause_poll_interval_ms": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 0,
+          "maximum": 60000,
+          "description": "While debugging, poll the adapter for a paused thread this often (ms) as a fallback when DAP events are missed. Set to 0 to disable."
+        },
+        "inflection_point.capture.max_local_depth": {
           "type": "number",
           "default": 2,
           "minimum": 0,
           "maximum": 6
         },
-        "principal.capture.max_variables_per_level": {
+        "inflection_point.capture.max_variables_per_level": {
           "type": "number",
           "default": 200,
           "minimum": 1,
           "maximum": 2000
         },
-        "principal.capture.max_total_local_nodes": {
+        "inflection_point.capture.max_total_local_nodes": {
           "type": "number",
           "default": 1200,
           "minimum": 10,
           "maximum": 50000
         },
-        "principal.capture.max_value_length": {
+        "inflection_point.capture.max_value_length": {
           "type": "number",
           "default": 4096,
           "minimum": 128,
           "maximum": 1000000
         },
-        "principal.capture.max_stack_frames": {
+        "inflection_point.capture.max_stack_frames": {
           "type": "number",
           "default": 12,
           "minimum": 1,
           "maximum": 200
         },
-        "principal.capture.max_breakpoints": {
+        "inflection_point.capture.max_breakpoints": {
           "type": "number",
           "default": 150,
           "minimum": 1,
           "maximum": 10000
         },
-        "principal.max_json_payload_chars": {
+        "inflection_point.max_json_payload_chars": {
           "type": "number",
           "default": 1500000,
           "minimum": 50000,
           "maximum": 20000000
         }
       }
+    },
+    "commands": [
+      {
+        "command": "inflection_point.copy_mcp_url",
+        "title": "Inflection Point: Copy MCP URL"
+      },
+      {
+        "command": "inflection_point.copy_mcp_json_snippet",
+        "title": "Inflection Point: Copy mcp.json snippet"
+      },
+      {
+        "command": "inflection_point.refresh_status",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "inflection_point.server_build",
+        "title": "Inflection Point: Build MCP Server",
+        "icon": "$(package)"
+      },
+      {
+        "command": "inflection_point.server_start",
+        "title": "Inflection Point: Start MCP Server",
+        "icon": "$(play)"
+      },
+      {
+        "command": "inflection_point.server_stop",
+        "title": "Inflection Point: Stop MCP Server",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "inflection_point.server_restart",
+        "title": "Inflection Point: Restart MCP Server",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "inflection_point.reconnect_mcp",
+        "title": "Inflection Point: Reconnect MCP",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "inflection_point.show_server_log",
+        "title": "Inflection Point: Show Server Log",
+        "icon": "$(output)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "inflection_point.copy_mcp_json_snippet",
+          "when": "view == inflection_point_status",
+          "group": "navigation@1"
+        },
+        {
+          "command": "inflection_point.refresh_status",
+          "when": "view == inflection_point_status",
+          "group": "navigation@2"
+        },
+        {
+          "command": "inflection_point.server_restart",
+          "when": "view == inflection_point_server_controls",
+          "group": "navigation@1"
+        },
+        {
+          "command": "inflection_point.reconnect_mcp",
+          "when": "view == inflection_point_server_controls",
+          "group": "navigation@2"
+        },
+        {
+          "command": "inflection_point.refresh_status",
+          "when": "view == inflection_point_server_controls",
+          "group": "navigation@3"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "inflection_point_sidebar",
+          "title": "Inflection Point",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "inflection_point_sidebar": [
+        {
+          "id": "inflection_point_status",
+          "name": "Debug bridge",
+          "contextualTitle": "Inflection Point"
+        },
+        {
+          "id": "inflection_point_server_controls",
+          "name": "Server controls",
+          "contextualTitle": "Inflection Point"
+        }
+      ]
     }
   },
   "scripts": {
@@ -76,14 +190,17 @@
     "watch": "tsc --noEmit --watch -p ./",
     "bundle": "node esbuild.js",
     "vscode:prepublish": "npm run bundle -- --production",
-    "package": "vsce package --no-dependencies",
-    "test": "echo \"no unit tests in-tree yet\""
+    "vsix": "vsce package --no-dependencies -o inflection-point.vsix",
+    "package": "npm run vsix",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.27.4",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.1"
   }
 }

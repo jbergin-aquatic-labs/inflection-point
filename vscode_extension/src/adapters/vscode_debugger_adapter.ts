@@ -31,6 +31,57 @@ export class vscode_debugger_adapter implements i_debugger_reader {
         return this.break_by_session.has(session.id);
     }
 
+    /**
+     * When the debug adapter tracker misses DAP "stopped", VS Code still exposes the focused thread/frame
+     * in the Call Stack UI (works for debugpy, cppdbg, js-debug, etc.).
+     */
+    async try_refresh_pause_from_ui_state(session: vscode.DebugSession): Promise<number | undefined> {
+        const item = vscode.debug.activeStackItem;
+        if (!item) return undefined;
+        if (item.session.id !== session.id) return undefined;
+        this.set_break_mode(session, item.threadId);
+        return item.threadId;
+    }
+
+    async probe_paused_thread_id(session: vscode.DebugSession): Promise<number | undefined> {
+        try {
+            const r = await session.customRequest("threads", {});
+            const threads = (r.threads as { id: number }[]) ?? [];
+            for (const t of threads) {
+                if (await this.thread_has_stack_frames(session, t.id)) return t.id;
+            }
+        } catch {
+            /* ignore */
+        }
+        return undefined;
+    }
+
+    /**
+     * Some adapters omit threadId on stopped events; a wrong hint (e.g. default 1) yields empty stack reads.
+     */
+    async resolve_stopped_thread_id(session: vscode.DebugSession, hint?: number): Promise<number> {
+        if (hint !== undefined && hint !== null && !Number.isNaN(hint)) {
+            if (await this.thread_has_stack_frames(session, hint)) return hint;
+        }
+        const scanned = await this.probe_paused_thread_id(session);
+        if (scanned !== undefined) return scanned;
+        return hint !== undefined && hint !== null && !Number.isNaN(hint) ? hint : 1;
+    }
+
+    private async thread_has_stack_frames(session: vscode.DebugSession, thread_id: number): Promise<boolean> {
+        try {
+            const st = await session.customRequest("stackTrace", {
+                threadId: thread_id,
+                startFrame: 0,
+                levels: 1,
+            });
+            const frames = st.stackFrames as unknown[] | undefined;
+            return Array.isArray(frames) && frames.length > 0;
+        } catch {
+            return false;
+        }
+    }
+
     private thread_id_for(session: vscode.DebugSession): number {
         return this.break_by_session.get(session.id)?.thread_id ?? 1;
     }
@@ -143,7 +194,7 @@ export class vscode_debugger_adapter implements i_debugger_reader {
             result.push({
                 name: `… (+${skipped} more at this level)`,
                 value: "",
-                type: "principal.capped",
+                type: "inflection_point.capped",
                 is_valid_value: true,
                 members: [],
             });
@@ -197,6 +248,15 @@ export class vscode_debugger_adapter implements i_debugger_reader {
                         enabled: bp.enabled,
                         condition: bp.condition ?? "",
                     });
+                } else if (is_function_breakpoint(bp)) {
+                    result.push({
+                        file_path: "(function_breakpoint)",
+                        line: 0,
+                        column: 0,
+                        function_name: bp.functionName,
+                        enabled: bp.enabled,
+                        condition: bp.condition ?? "",
+                    });
                 }
             }
             if (result.length <= max) return success(result);
@@ -214,12 +274,12 @@ export class vscode_debugger_adapter implements i_debugger_reader {
             const capped = prioritized.slice(0, kept_for_real);
             const omitted = result.length - capped.length;
             capped.push({
-                file_path: "(principal)",
+                file_path: "(inflection_point)",
                 line: 0,
                 column: 0,
                 function_name: `+${omitted} breakpoints omitted`,
                 enabled: false,
-                condition: "raise principal.capture.max_breakpoints to send more.",
+                condition: "raise inflection_point.capture.max_breakpoints to send more.",
             });
             return success(capped);
         } catch (e) {
@@ -230,6 +290,10 @@ export class vscode_debugger_adapter implements i_debugger_reader {
 
 function is_source_breakpoint(bp: vscode.Breakpoint): bp is vscode.SourceBreakpoint {
     return "location" in bp;
+}
+
+function is_function_breakpoint(bp: vscode.Breakpoint): bp is vscode.FunctionBreakpoint {
+    return "functionName" in bp;
 }
 
 interface dap_stack_frame {
