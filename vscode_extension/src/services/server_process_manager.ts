@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { i_extension_logger } from "../abstractions/i_extension_logger";
@@ -67,21 +68,33 @@ export class server_process_manager {
     }
 
     private start_process(info: resolved_start_info): void {
+        const log_path = server_process_manager.get_log_path(this.port);
+        fs.mkdirSync(path.dirname(log_path), { recursive: true });
+        // Truncate log on each start so it doesn't grow unbounded.
+        fs.writeFileSync(log_path, `--- MCP server started ${new Date().toISOString()} ---\n`);
+        const log_fd = fs.openSync(log_path, "a");
+
         this.logger.log(`starting MCP server: ${info.command} ${info.args.join(" ")} (cwd ${info.cwd})`);
+        this.logger.log(`server log: ${log_path}`);
         this.process = spawn(info.command, info.args, {
-            stdio: ["ignore", "pipe", "pipe"],
+            // Redirect stdout+stderr to the persistent log file so output survives extension reloads.
+            stdio: ["ignore", log_fd, log_fd],
             detached: true,
             cwd: info.cwd,
         });
-        this.process.stdout?.on("data", (data: Buffer) => {
-            this.logger.log(data.toString().trimEnd());
+        this.process.on("exit", (code) => {
+            try { fs.closeSync(log_fd); } catch { /* ignore */ }
+            this.on_process_exited(code);
         });
-        this.process.stderr?.on("data", (data: Buffer) => {
-            this.logger.log(`[stderr] ${data.toString().trimEnd()}`);
-        });
-        this.process.on("exit", (code) => this.on_process_exited(code));
         this.process.unref();
         this.logger.log(`MCP server started (PID ${this.process.pid}) on http://127.0.0.1:${this.port}/`);
+    }
+
+    static get_log_path(port: number): string {
+        const base = process.platform === "win32"
+            ? process.env.LOCALAPPDATA ?? os.tmpdir()
+            : process.env.HOME ?? os.tmpdir();
+        return path.join(base, ".inflection_point", `server-${port}.log`);
     }
 
     private resolve_start_info(): result<resolved_start_info> {

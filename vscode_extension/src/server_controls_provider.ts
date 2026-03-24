@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { server_lock_file } from "./services/server_lock_file";
+import { server_process_manager } from "./services/server_process_manager";
 
 export class server_controls_provider implements vscode.TreeDataProvider<vscode.TreeItem> {
     private readonly _on_did_change = new vscode.EventEmitter<void>();
@@ -88,6 +89,24 @@ export class server_controls_provider implements vscode.TreeDataProvider<vscode.
                 )
             );
         }
+
+        items.push(
+            make_action(
+                "Reconnect MCP",
+                "$(plug)",
+                "inflection_point.reconnect_mcp",
+                "Force Cursor to drop and re-establish the MCP connection"
+            )
+        );
+
+        items.push(
+            make_action(
+                "Show server log",
+                "$(output)",
+                "inflection_point.show_server_log",
+                `Open ${server_process_manager.get_log_path(port)}`
+            )
+        );
 
         return items;
     }

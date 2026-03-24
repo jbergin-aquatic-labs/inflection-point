@@ -119,6 +119,16 @@
         "command": "inflection_point.server_restart",
         "title": "Inflection Point: Restart MCP Server",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "inflection_point.reconnect_mcp",
+        "title": "Inflection Point: Reconnect MCP",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "inflection_point.show_server_log",
+        "title": "Inflection Point: Show Server Log",
+        "icon": "$(output)"
       }
     ],
     "menus": {
@@ -139,9 +149,14 @@
           "group": "navigation@1"
         },
         {
-          "command": "inflection_point.refresh_status",
+          "command": "inflection_point.reconnect_mcp",
           "when": "view == inflection_point_server_controls",
           "group": "navigation@2"
+        },
+        {
+          "command": "inflection_point.refresh_status",
+          "when": "view == inflection_point_server_controls",
+          "group": "navigation@3"
         }
       ]
     },

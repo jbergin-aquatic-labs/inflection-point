@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as crypto from "node:crypto";
+import * as fs from "node:fs";
 import { output_logger } from "./output_logger";
 import { vscode_debugger_adapter } from "./adapters/vscode_debugger_adapter";
 import { http_debug_state_publisher } from "./adapters/http_debug_state_publisher";
@@ -13,6 +14,7 @@ import {
 } from "./inflection_point_status_provider";
 import { server_controls_provider } from "./server_controls_provider";
 import { create_workspace_session_identity_resolver } from "./workspace_session_identity";
+
 
 let logger: output_logger | undefined;
 let publisher: http_debug_state_publisher | undefined;
@@ -151,6 +153,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             await pm.restart(port);
             refresh_all();
             void vscode.window.showInformationMessage(`MCP server restarted on port ${port}.`);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("inflection_point.reconnect_mcp", () => {
+            // The mcp.json entry handles the actual connection; this just refreshes the sidebar.
+            refresh_all();
+            void vscode.window.showInformationMessage("Sidebar refreshed. Cursor reconnects automatically once the server is up.");
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("inflection_point.show_server_log", async () => {
+            const log_path = server_process_manager.get_log_path(port);
+            if (!fs.existsSync(log_path)) {
+                void vscode.window.showWarningMessage(`Server log not found at ${log_path}. Start the server first.`);
+                return;
+            }
+            const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(log_path));
+            await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
         })
     );
 

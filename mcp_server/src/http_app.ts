@@ -1,5 +1,4 @@
 import express from "express";
-import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { session_manager } from "./session_manager.js";
@@ -10,9 +9,13 @@ import type { debug_state, expression_result } from "./domain_types.js";
 /**
  * JSON body parsing is limited to /api only. Global json() breaks MCP streamable HTTP
  * (GET/SSE and POST) because it consumes or rejects the request stream before handleRequest runs.
+ *
+ * We use a plain express() app instead of createMcpExpressApp() for exactly this reason:
+ * createMcpExpressApp() applies express.json() globally, which consumes the request body
+ * before StreamableHTTPServerTransport.handleRequest() can read it, causing "stream is not readable".
  */
 export function create_app(sessions: session_manager, query: debug_query_service): express.Application {
-    const app = createMcpExpressApp();
+    const app = express();
 
     const api = express.Router();
     api.use(express.json({ limit: "50mb" }));
