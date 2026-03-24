@@ -3,6 +3,8 @@ import supertest from "supertest";
 import { create_app } from "../http_app.js";
 import { session_manager } from "../session_manager.js";
 import { debug_query_service } from "../debug_query_service.js";
+import { agent_command_broker } from "../agent_command_broker.js";
+import { agent_control_service } from "../agent_control_service.js";
 import { empty_debug_state } from "../domain_types.js";
 
 describe("http_app REST routes", () => {
@@ -12,7 +14,9 @@ describe("http_app REST routes", () => {
     beforeEach(() => {
         mgr = new session_manager();
         const query = new debug_query_service(mgr);
-        app = create_app(mgr, query);
+        const broker = new agent_command_broker();
+        const agent_control = new agent_control_service(mgr, broker);
+        app = create_app(mgr, query, broker, agent_control);
     });
 
     it("GET /api/health returns running status", async () => {

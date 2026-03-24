@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { debug_query_service } from "./debug_query_service.js";
+import type { agent_control_service } from "./agent_control_service.js";
 
 function tool_text(r: { ok: true; value: string } | { ok: false; description: string }) {
     if (r.ok) {
@@ -12,7 +13,11 @@ function tool_text(r: { ok: true; value: string } | { ok: false; description: st
     };
 }
 
-export function register_debug_tools(server: McpServer, query: debug_query_service): void {
+export function register_debug_tools(
+    server: McpServer,
+    query: debug_query_service,
+    agent_control: agent_control_service
+): void {
     server.registerTool(
         "list_sessions",
         {
@@ -173,5 +178,92 @@ export function register_debug_tools(server: McpServer, query: debug_query_servi
         },
         async ({ session, detail, depth, start, count }) =>
             tool_text(query.explain_execution_flow(session, detail, depth, start, count))
+    );
+
+    server.registerTool(
+        "list_launch_configs",
+        {
+            description:
+                "List launch.json configuration names synced from the IDE and whether the agent may start each (Inflection Point → Agent run). Use before start_debugging.",
+            inputSchema: {
+                session: z.string().describe("Session name or ID from list_sessions."),
+            },
+        },
+        async ({ session }) => tool_text(agent_control.list_launch_configs(session))
+    );
+
+    server.registerTool(
+        "start_debugging",
+        {
+            description:
+                "Request the Inflection Point extension to start a launch.json configuration by name (same as Run and Debug). Respects allow/block checkboxes in the Agent run sidebar. Waits until the extension runs the command or times out.",
+            inputSchema: {
+                session: z.string().describe("Session name or ID from list_sessions."),
+                launch_config_name: z
+                    .string()
+                    .describe('Exact "name" from launch.json, e.g. "Pipeline: evaluation".'),
+                timeout_ms: z
+                    .number()
+                    .optional()
+                    .default(60_000)
+                    .describe("Max wait for the extension (ms). Default 60000."),
+            },
+        },
+        async ({ session, launch_config_name, timeout_ms }) =>
+            tool_text(await agent_control.start_debugging(session, launch_config_name, timeout_ms ?? 60_000))
+    );
+
+    server.registerTool(
+        "add_editor_breakpoint",
+        {
+            description:
+                "Add a source breakpoint in the IDE at file_path and line (1-based). Extension must be connected.",
+            inputSchema: {
+                session: z.string().describe("Session name or ID from list_sessions."),
+                file_path: z.string().describe("Absolute path to the source file."),
+                line: z.number().int().positive().describe("1-based line number."),
+                timeout_ms: z.number().optional().default(30_000),
+            },
+        },
+        async ({ session, file_path, line, timeout_ms }) =>
+            tool_text(
+                await agent_control.add_editor_breakpoint(session, file_path, line, timeout_ms ?? 30_000)
+            )
+    );
+
+    server.registerTool(
+        "remove_editor_breakpoint",
+        {
+            description: "Remove source breakpoints at file_path and line (1-based) in the IDE.",
+            inputSchema: {
+                session: z.string().describe("Session name or ID from list_sessions."),
+                file_path: z.string(),
+                line: z.number().int().positive(),
+                timeout_ms: z.number().optional().default(30_000),
+            },
+        },
+        async ({ session, file_path, line, timeout_ms }) =>
+            tool_text(
+                await agent_control.remove_editor_breakpoint(
+                    session,
+                    file_path,
+                    line,
+                    timeout_ms ?? 30_000
+                )
+            )
+    );
+
+    server.registerTool(
+        "debug_continue",
+        {
+            description:
+                "Execute the Continue debug action in the IDE (resume after a breakpoint). Extension must be connected.",
+            inputSchema: {
+                session: z.string().describe("Session name or ID from list_sessions."),
+                timeout_ms: z.number().optional().default(15_000),
+            },
+        },
+        async ({ session, timeout_ms }) =>
+            tool_text(await agent_control.debug_continue(session, timeout_ms ?? 15_000))
     );
 }

@@ -14,7 +14,8 @@ import {
 } from "./inflection_point_status_provider";
 import { server_controls_provider } from "./server_controls_provider";
 import { create_workspace_session_identity_resolver } from "./workspace_session_identity";
-
+import { agent_launch_provider } from "./agent_launch_provider";
+import { agent_command_client } from "./agent_command_client";
 
 let logger: output_logger | undefined;
 let publisher: http_debug_state_publisher | undefined;
@@ -22,6 +23,8 @@ let process_manager: server_process_manager | undefined;
 let coordinator: debug_event_coordinator | undefined;
 let status_provider: inflection_point_status_provider | undefined;
 let controls_provider: server_controls_provider | undefined;
+let launch_provider: agent_launch_provider | undefined;
+let agent_client: agent_command_client | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     logger = new output_logger();
@@ -93,6 +96,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.commands.registerCommand("inflection_point.refresh_status", () => {
             status_provider?.refresh();
             controls_provider?.refresh();
+            launch_provider?.refresh();
         })
     );
 
@@ -109,9 +113,50 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return process_manager;
     };
 
+    launch_provider = new agent_launch_provider(context);
+    launch_provider.set_port(port);
+    const launch_tree = vscode.window.createTreeView("inflection_point_agent_launch", {
+        treeDataProvider: launch_provider,
+        manageCheckboxStateManually: true,
+    });
+    context.subscriptions.push(launch_tree);
+    context.subscriptions.push(
+        launch_tree.onDidChangeCheckboxState((e) => launch_provider?.handle_checkbox_change(e))
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand("inflection_point.toggle_agent_launch_mode", () =>
+            launch_provider?.toggle_mode()
+        )
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand("inflection_point.refresh_agent_launch", () =>
+            launch_provider?.refresh()
+        )
+    );
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeWorkspaceFolders(() => launch_provider?.refresh())
+    );
+    const ws0 = vscode.workspace.workspaceFolders?.[0];
+    if (ws0) {
+        const watcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(ws0, ".vscode/launch.json")
+        );
+        let debounce: ReturnType<typeof setTimeout> | undefined;
+        const schedule = (): void => {
+            if (debounce) clearTimeout(debounce);
+            debounce = setTimeout(() => launch_provider?.refresh(), 400);
+        };
+        watcher.onDidChange(schedule);
+        watcher.onDidCreate(schedule);
+        watcher.onDidDelete(schedule);
+        context.subscriptions.push(watcher);
+    }
+    launch_provider.refresh();
+
     const refresh_all = (): void => {
         status_provider?.refresh();
         controls_provider?.refresh();
+        launch_provider?.refresh();
     };
 
     context.subscriptions.push(
@@ -275,6 +320,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     publisher.start_heartbeat();
+
+    if (config.get<boolean>("agent_commands_enabled", true)) {
+        agent_client = new agent_command_client(port, logger);
+        agent_client.start();
+        context.subscriptions.push(agent_client);
+        logger.log("Agent command client: polling for MCP-requested debug actions.");
+    }
 
     context.subscriptions.push({
         dispose() {
