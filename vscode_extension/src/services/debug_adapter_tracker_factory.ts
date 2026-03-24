@@ -15,6 +15,7 @@ export class debug_adapter_tracker_factory implements vscode.DebugAdapterTracker
     createDebugAdapterTracker(
         session: vscode.DebugSession
     ): vscode.ProviderResult<vscode.DebugAdapterTracker> {
+        this.logger.log(`tracker created for session "${session.name}" (type=${session.type})`);
         return new principal_debug_tracker(
             session,
             this.adapter,
@@ -45,6 +46,7 @@ class principal_debug_tracker implements vscode.DebugAdapterTracker {
         if (normalized.type !== "event") return;
         if (normalized.event === "stopped") {
             const hint = (normalized.body as { threadId?: number } | undefined)?.threadId;
+            this.logger.log(`DAP stopped event (threadId=${hint ?? "none"}) — initiating push`);
             this.coordinator.invalidate_in_flight_pushes();
             const generation = this.coordinator.current_push_generation;
             void this.coordinator.request_pause_push(this.session, hint, generation);

@@ -52,7 +52,10 @@ export class debug_event_coordinator {
                 resolve_hint = tid;
             }
 
-            if (generation !== this.push_generation) return;
+            if (generation !== this.push_generation) {
+                this.logger.log(`push cancelled: generation stale (captured=${generation}, current=${this.push_generation})`);
+                return;
+            }
             if (!this.reader.is_in_break_mode(session)) return;
 
             const resolved = await this.reader.resolve_stopped_thread_id(session, resolve_hint);
@@ -71,8 +74,12 @@ export class debug_event_coordinator {
             const state = await this.build_debug_state(session);
             if (captured_generation !== this.push_generation) return;
             if (!this.reader.is_in_break_mode(session)) return;
+            this.logger.log(
+                `pushing debug state: break=${state.is_in_break_mode} loc=${state.current_location?.file_path ?? "none"}:${state.current_location?.line ?? 0} locals=${state.locals.length} stack=${state.call_stack.length}`
+            );
             const result = await this.publisher.push_debug_state(state, session);
             if (!result.ok) this.logger.log(result.error.description);
+            else this.logger.log("debug state pushed to server.");
         } catch (e) {
             this.logger.log(`error pushing debug state: ${e}`);
         }

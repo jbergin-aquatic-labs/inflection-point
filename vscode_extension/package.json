@@ -99,6 +99,26 @@
         "command": "inflection_point.refresh_status",
         "title": "Refresh",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "inflection_point.server_build",
+        "title": "Inflection Point: Build MCP Server",
+        "icon": "$(package)"
+      },
+      {
+        "command": "inflection_point.server_start",
+        "title": "Inflection Point: Start MCP Server",
+        "icon": "$(play)"
+      },
+      {
+        "command": "inflection_point.server_stop",
+        "title": "Inflection Point: Stop MCP Server",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "inflection_point.server_restart",
+        "title": "Inflection Point: Restart MCP Server",
+        "icon": "$(debug-restart)"
       }
     ],
     "menus": {
@@ -111,6 +131,16 @@
         {
           "command": "inflection_point.refresh_status",
           "when": "view == inflection_point_status",
+          "group": "navigation@2"
+        },
+        {
+          "command": "inflection_point.server_restart",
+          "when": "view == inflection_point_server_controls",
+          "group": "navigation@1"
+        },
+        {
+          "command": "inflection_point.refresh_status",
+          "when": "view == inflection_point_server_controls",
           "group": "navigation@2"
         }
       ]
@@ -129,6 +159,11 @@
         {
           "id": "inflection_point_status",
           "name": "Debug bridge",
+          "contextualTitle": "Inflection Point"
+        },
+        {
+          "id": "inflection_point_server_controls",
+          "name": "Server controls",
           "contextualTitle": "Inflection Point"
         }
       ]

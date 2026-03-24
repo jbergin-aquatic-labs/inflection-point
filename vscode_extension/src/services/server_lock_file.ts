@@ -59,6 +59,10 @@ export class server_lock_file {
         }
     }
 
+    static read_lock_pid(port: number): number | undefined {
+        return this.read_pid(this.path_for(port));
+    }
+
     private static read_pid(file_path: string): number | undefined {
         try {
             const text = fs.readFileSync(file_path, "utf-8").trim();

@@ -7,6 +7,20 @@
       "request": "launch",
       "args": ["--extensionDevelopmentPath=${workspaceFolder}/vscode_extension"],
       "outFiles": ["${workspaceFolder}/vscode_extension/out/**/*.js"]
+    },
+    {
+      "name": "Debug MCP Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/mcp_server/dist/main.js",
+      "cwd": "${workspaceFolder}/mcp_server",
+      "outFiles": ["${workspaceFolder}/mcp_server/dist/**/*.js"],
+      "sourceMaps": true,
+      "preLaunchTask": "build-mcp-server",
+      "console": "integratedTerminal",
+      "env": {
+        "NODE_ENV": "development"
+      }
     }
   ]
 }

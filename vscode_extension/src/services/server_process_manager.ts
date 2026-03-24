@@ -130,6 +130,32 @@ export class server_process_manager {
         if (info.ok) this.start_process(info.value);
     }
 
+    async stop(): Promise<void> {
+        const pid = this.process?.pid ?? server_lock_file.read_lock_pid(this.port);
+        if (pid !== undefined) {
+            this.logger.log(`stopping MCP server (PID ${pid})...`);
+            try {
+                process.kill(pid, "SIGTERM");
+            } catch {
+                /* already dead */
+            }
+        }
+        this.process = null;
+        server_lock_file.remove(this.port);
+        this.logger.log("MCP server stopped.");
+    }
+
+    async restart(port?: number): Promise<void> {
+        const p = port ?? this.port;
+        await this.stop();
+        this.disposed = false;
+        await this.start(p);
+    }
+
+    get running_pid(): number | undefined {
+        return this.process?.pid ?? server_lock_file.read_lock_pid(this.port);
+    }
+
     static async is_server_running(port: number, timeout_ms: number): Promise<boolean> {
         const deadline = Date.now() + timeout_ms;
         while (Date.now() < deadline) {

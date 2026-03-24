@@ -11,6 +11,7 @@ import {
     inflection_point_status_provider,
     start_status_refresh,
 } from "./inflection_point_status_provider";
+import { server_controls_provider } from "./server_controls_provider";
 import { create_workspace_session_identity_resolver } from "./workspace_session_identity";
 
 let logger: output_logger | undefined;
@@ -18,6 +19,7 @@ let publisher: http_debug_state_publisher | undefined;
 let process_manager: server_process_manager | undefined;
 let coordinator: debug_event_coordinator | undefined;
 let status_provider: inflection_point_status_provider | undefined;
+let controls_provider: server_controls_provider | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     logger = new output_logger();
@@ -88,6 +90,67 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(
         vscode.commands.registerCommand("inflection_point.refresh_status", () => {
             status_provider?.refresh();
+            controls_provider?.refresh();
+        })
+    );
+
+    controls_provider = new server_controls_provider();
+    controls_provider.set_port(port);
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider("inflection_point_server_controls", controls_provider)
+    );
+
+    const ensure_process_manager = (): server_process_manager => {
+        if (!process_manager) {
+            process_manager = new server_process_manager(logger!);
+        }
+        return process_manager;
+    };
+
+    const refresh_all = (): void => {
+        status_provider?.refresh();
+        controls_provider?.refresh();
+    };
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("inflection_point.server_build", async () => {
+            const ws = vscode.workspace.workspaceFolders?.[0];
+            if (!ws) {
+                void vscode.window.showErrorMessage("No workspace folder open.");
+                return;
+            }
+            const terminal = vscode.window.createTerminal({ name: "IP: build server", cwd: ws.uri });
+            terminal.show();
+            terminal.sendText("npm run build");
+            void vscode.window.showInformationMessage("Building MCP server… (see terminal)");
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("inflection_point.server_start", async () => {
+            const pm = ensure_process_manager();
+            await pm.start(port);
+            refresh_all();
+            void vscode.window.showInformationMessage(`MCP server starting on port ${port}…`);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("inflection_point.server_stop", async () => {
+            const pm = ensure_process_manager();
+            await pm.stop();
+            refresh_all();
+            void vscode.window.showInformationMessage("MCP server stopped.");
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("inflection_point.server_restart", async () => {
+            const pm = ensure_process_manager();
+            void vscode.window.showInformationMessage("Restarting MCP server…");
+            await pm.restart(port);
+            refresh_all();
+            void vscode.window.showInformationMessage(`MCP server restarted on port ${port}.`);
         })
     );
 
@@ -160,14 +223,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     const poll_ms = config.get<number>("debug_pause_poll_interval_ms", 2000);
     if (poll_ms > 0) {
-        const poll_handle = setInterval(() => {
+        let poll_push_in_flight = false;
+        const poll_handle = setInterval(async () => {
             const session = vscode.debug.activeDebugSession;
             if (!session || !coordinator) return;
-            const item = vscode.debug.activeStackItem;
-            if (stack_item_is_for_session(item, session)) {
-                schedule_pause_push_from_ui(session);
-            } else if (adapter.is_in_break_mode(session)) {
-                void coordinator.request_pause_push(session, undefined);
+            if (poll_push_in_flight) return;
+            poll_push_in_flight = true;
+            try {
+                // Poll never invalidates — it's a retry mechanism, not a state-change signal.
+                // Probes the debug adapter for a paused thread and pushes if found.
+                await coordinator.request_pause_push(session, undefined);
+            } finally {
+                poll_push_in_flight = false;
             }
         }, poll_ms);
         context.subscriptions.push({
@@ -178,8 +245,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         logger.log(`pause poll: every ${poll_ms}ms while debugging (set inflection_point.debug_pause_poll_interval_ms to 0 to disable).`);
     }
 
-    const reg = await coordinator.register();
-    if (!reg.ok) logger.log(reg.error.description);
+    try {
+        const reg = await coordinator.register();
+        if (!reg.ok) logger.log(reg.error.description);
+    } catch (e) {
+        logger.log(`initial registration failed: ${e}`);
+    }
 
     publisher.start_heartbeat();
 

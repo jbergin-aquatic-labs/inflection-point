@@ -1,5 +1,5 @@
 import * as crypto from "node:crypto";
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 
 export type workspace_session_identity = {
     session_id: string;
