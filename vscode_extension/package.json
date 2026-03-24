@@ -42,6 +42,11 @@
           "maximum": 60000,
           "description": "While debugging, poll the adapter for a paused thread this often (ms) as a fallback when DAP events are missed. Set to 0 to disable."
         },
+        "inflection_point.agent_commands_enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Long-poll the MCP server for agent-requested actions (start debugging, breakpoints, continue)."
+        },
         "inflection_point.capture.max_local_depth": {
           "type": "number",
           "default": 2,
@@ -129,6 +134,15 @@
         "command": "inflection_point.show_server_log",
         "title": "Inflection Point: Show Server Log",
         "icon": "$(output)"
+      },
+      {
+        "command": "inflection_point.toggle_agent_launch_mode",
+        "title": "Inflection Point: Toggle agent launch mode (open/strict)"
+      },
+      {
+        "command": "inflection_point.refresh_agent_launch",
+        "title": "Refresh",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -157,6 +171,11 @@
           "command": "inflection_point.refresh_status",
           "when": "view == inflection_point_server_controls",
           "group": "navigation@3"
+        },
+        {
+          "command": "inflection_point.refresh_agent_launch",
+          "when": "view == inflection_point_agent_launch",
+          "group": "navigation@1"
         }
       ]
     },
@@ -179,6 +198,11 @@
         {
           "id": "inflection_point_server_controls",
           "name": "Server controls",
+          "contextualTitle": "Inflection Point"
+        },
+        {
+          "id": "inflection_point_agent_launch",
+          "name": "Agent run (launch)",
           "contextualTitle": "Inflection Point"
         }
       ]

@@ -2,6 +2,8 @@ import type { Server } from "node:http";
 import { create_app } from "./http_app.js";
 import { session_manager } from "./session_manager.js";
 import { debug_query_service } from "./debug_query_service.js";
+import { agent_command_broker } from "./agent_command_broker.js";
+import { agent_control_service } from "./agent_control_service.js";
 
 function parse_port(args: string[], default_port = 9229): number {
     for (let i = 0; i < args.length - 1; i++) {
@@ -73,11 +75,16 @@ function main(): void {
     const port = parse_port(process.argv);
     const sessions = new session_manager();
     const query = new debug_query_service(sessions);
-    const app = create_app(sessions, query);
+    const broker = new agent_command_broker();
+    const agent_control = new agent_control_service(sessions, broker);
+    const app = create_app(sessions, query, broker, agent_control);
 
     const server = app.listen(port, "127.0.0.1", () => {
         console.error(
             `inflection_point_mcp_server listening on http://127.0.0.1:${port}/ (MCP streamable HTTP: GET/POST / or /mcp)`
+        );
+        console.error(
+            "MCP agent tools: get_agent_capabilities, list_launch_configs, start_debugging, add/remove_editor_breakpoint, debug_continue (see GET /about)"
         );
     });
 

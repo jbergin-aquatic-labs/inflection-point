@@ -43,6 +43,7 @@ describe("debug_query_service", () => {
             if (r.ok) {
                 expect(r.value).toContain("1 session(s)");
                 expect(r.value).toContain("App1");
+                expect(r.value).toContain("get_agent_capabilities");
             }
         });
     });

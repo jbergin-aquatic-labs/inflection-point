@@ -56,6 +56,19 @@ Reload MCP or restart Cursor so it picks this up.
 
 Then open your app folder, **start debugging**, hit a **breakpoint**, and use **chat** — models can call MCP tools (`list_sessions`, `get_debug_state`, etc.) against your session.
 
+### Agent-run debugging (MCP controls the IDE)
+
+The extension exposes an **Agent run (launch)** sidebar view: it reads `.vscode/launch.json` and lets you **check or uncheck** which configurations the agent may start. Toggle **open** (default: all allowed unless unchecked) vs **strict** (only checked names allowed). The model can call MCP tools:
+
+- `list_launch_configs` — names and allow/block state  
+- `start_debugging` — runs `vscode.debug.startDebugging` for a launch name  
+- `add_editor_breakpoint` / `remove_editor_breakpoint` — editor source breakpoints (absolute path, 1-based line)  
+- `debug_continue` — Continue in the debug toolbar  
+
+The extension long-polls the server for these commands (disable with **`inflection_point.agent_commands_enabled`: false**).
+
+On the MCP server, call **`get_agent_capabilities`** for the full workflow text, or **`GET http://127.0.0.1:9229/about`** for JSON including `agent_control` REST hints.
+
 **Optional:** run the server yourself instead of auto-start:
 
 ```bash
