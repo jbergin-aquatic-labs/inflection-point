@@ -91,10 +91,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         })
     );
 
-    context.subscriptions.push(
-        vscode.debug.onDidChangeActiveDebugSession(() => status_provider?.refresh())
-    );
-
     if (auto_start) {
         const running = await server_process_manager.is_server_running(port, 3000);
         if (running) {
@@ -127,6 +123,60 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const trace_dap = config.get<boolean>("trace_dap", false);
     const tracker_factory = new debug_adapter_tracker_factory(adapter, coordinator, logger, trace_dap);
     context.subscriptions.push(vscode.debug.registerDebugAdapterTrackerFactory("*", tracker_factory));
+
+    const schedule_pause_push_from_ui = (session: vscode.DebugSession): void => {
+        coordinator?.invalidate_in_flight_pushes();
+        const generation = coordinator?.current_push_generation ?? 0;
+        void coordinator?.request_pause_push(session, null, generation);
+    };
+
+    const stack_item_is_for_session = (
+        item: vscode.DebugThread | vscode.DebugStackFrame | undefined,
+        session: vscode.DebugSession
+    ): boolean =>
+        !!item &&
+        (item instanceof vscode.DebugThread || item instanceof vscode.DebugStackFrame) &&
+        item.session.id === session.id;
+
+    context.subscriptions.push(
+        vscode.debug.onDidChangeActiveStackItem(() => {
+            const session = vscode.debug.activeDebugSession;
+            if (!session || !coordinator) return;
+            if (stack_item_is_for_session(vscode.debug.activeStackItem, session)) {
+                schedule_pause_push_from_ui(session);
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.debug.onDidChangeActiveDebugSession((session) => {
+            status_provider?.refresh();
+            if (!session || !coordinator) return;
+            if (stack_item_is_for_session(vscode.debug.activeStackItem, session)) {
+                schedule_pause_push_from_ui(session);
+            }
+        })
+    );
+
+    const poll_ms = config.get<number>("debug_pause_poll_interval_ms", 2000);
+    if (poll_ms > 0) {
+        const poll_handle = setInterval(() => {
+            const session = vscode.debug.activeDebugSession;
+            if (!session || !coordinator) return;
+            const item = vscode.debug.activeStackItem;
+            if (stack_item_is_for_session(item, session)) {
+                schedule_pause_push_from_ui(session);
+            } else if (adapter.is_in_break_mode(session)) {
+                void coordinator.request_pause_push(session, undefined);
+            }
+        }, poll_ms);
+        context.subscriptions.push({
+            dispose() {
+                clearInterval(poll_handle);
+            },
+        });
+        logger.log(`pause poll: every ${poll_ms}ms while debugging (set inflection_point.debug_pause_poll_interval_ms to 0 to disable).`);
+    }
 
     const reg = await coordinator.register();
     if (!reg.ok) logger.log(reg.error.description);
