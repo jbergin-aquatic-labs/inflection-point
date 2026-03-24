@@ -28,6 +28,10 @@ export class debug_query_service {
             const status = s.has_debug_state ? "debugging" : "idle";
             lines.push(`  ${s.name} [${s.session_id}] (${status}) - ${s.solution_path}`);
         }
+        lines.push("");
+        lines.push(
+            "Agent automation: MCP tool get_agent_capabilities (then list_launch_configs, start_debugging, breakpoints, debug_continue)."
+        );
         return ok(lines.join("\n"));
     }
 

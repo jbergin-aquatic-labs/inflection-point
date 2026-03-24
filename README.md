@@ -67,6 +67,8 @@ The extension exposes an **Agent run (launch)** sidebar view: it reads `.vscode/
 
 The extension long-polls the server for these commands (disable with **`inflection_point.agent_commands_enabled`: false**).
 
+On the MCP server, call **`get_agent_capabilities`** for the full workflow text, or **`GET http://127.0.0.1:9229/about`** for JSON including `agent_control` REST hints.
+
 **Optional:** run the server yourself instead of auto-start:
 
 ```bash

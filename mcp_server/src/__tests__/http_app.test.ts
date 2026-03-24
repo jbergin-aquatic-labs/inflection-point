@@ -80,5 +80,7 @@ describe("http_app REST routes", () => {
         expect(res.status).toBe(200);
         expect(res.body.service).toBe("inflection_point_mcp_server");
         expect(res.body.health).toBe("/api/health");
+        expect(res.body.agent_control).toBeDefined();
+        expect(res.body.agent_control.extension_poll).toContain("agent-commands/next");
     });
 });

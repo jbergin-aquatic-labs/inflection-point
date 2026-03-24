@@ -181,13 +181,23 @@ export function register_debug_tools(
     );
 
     server.registerTool(
+        "get_agent_capabilities",
+        {
+            description:
+                "Describe how to drive the IDE from MCP: launch configs, breakpoints, continue, required extension settings, and REST endpoints. Call first when automating debug.",
+            inputSchema: z.object({}),
+        },
+        async () => tool_text(agent_control.describe_capabilities())
+    );
+
+    server.registerTool(
         "list_launch_configs",
         {
             description:
                 "List launch.json configuration names synced from the IDE and whether the agent may start each (Inflection Point → Agent run). Use before start_debugging.",
-            inputSchema: {
+            inputSchema: z.object({
                 session: z.string().describe("Session name or ID from list_sessions."),
-            },
+            }),
         },
         async ({ session }) => tool_text(agent_control.list_launch_configs(session))
     );
@@ -197,7 +207,7 @@ export function register_debug_tools(
         {
             description:
                 "Request the Inflection Point extension to start a launch.json configuration by name (same as Run and Debug). Respects allow/block checkboxes in the Agent run sidebar. Waits until the extension runs the command or times out.",
-            inputSchema: {
+            inputSchema: z.object({
                 session: z.string().describe("Session name or ID from list_sessions."),
                 launch_config_name: z
                     .string()
@@ -207,7 +217,7 @@ export function register_debug_tools(
                     .optional()
                     .default(60_000)
                     .describe("Max wait for the extension (ms). Default 60000."),
-            },
+            }),
         },
         async ({ session, launch_config_name, timeout_ms }) =>
             tool_text(await agent_control.start_debugging(session, launch_config_name, timeout_ms ?? 60_000))
@@ -218,12 +228,12 @@ export function register_debug_tools(
         {
             description:
                 "Add a source breakpoint in the IDE at file_path and line (1-based). Extension must be connected.",
-            inputSchema: {
+            inputSchema: z.object({
                 session: z.string().describe("Session name or ID from list_sessions."),
                 file_path: z.string().describe("Absolute path to the source file."),
                 line: z.number().int().positive().describe("1-based line number."),
                 timeout_ms: z.number().optional().default(30_000),
-            },
+            }),
         },
         async ({ session, file_path, line, timeout_ms }) =>
             tool_text(
@@ -235,12 +245,12 @@ export function register_debug_tools(
         "remove_editor_breakpoint",
         {
             description: "Remove source breakpoints at file_path and line (1-based) in the IDE.",
-            inputSchema: {
+            inputSchema: z.object({
                 session: z.string().describe("Session name or ID from list_sessions."),
                 file_path: z.string(),
                 line: z.number().int().positive(),
                 timeout_ms: z.number().optional().default(30_000),
-            },
+            }),
         },
         async ({ session, file_path, line, timeout_ms }) =>
             tool_text(
@@ -258,10 +268,10 @@ export function register_debug_tools(
         {
             description:
                 "Execute the Continue debug action in the IDE (resume after a breakpoint). Extension must be connected.",
-            inputSchema: {
+            inputSchema: z.object({
                 session: z.string().describe("Session name or ID from list_sessions."),
                 timeout_ms: z.number().optional().default(15_000),
-            },
+            }),
         },
         async ({ session, timeout_ms }) =>
             tool_text(await agent_control.debug_continue(session, timeout_ms ?? 15_000))

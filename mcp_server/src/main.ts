@@ -83,6 +83,9 @@ function main(): void {
         console.error(
             `inflection_point_mcp_server listening on http://127.0.0.1:${port}/ (MCP streamable HTTP: GET/POST / or /mcp)`
         );
+        console.error(
+            "MCP agent tools: get_agent_capabilities, list_launch_configs, start_debugging, add/remove_editor_breakpoint, debug_continue (see GET /about)"
+        );
     });
 
     maybe_start_idle_shutdown_watchdog(server, sessions);

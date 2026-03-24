@@ -26,6 +26,36 @@ export class agent_control_service {
         private readonly broker: agent_command_broker
     ) {}
 
+    /** Plain-text overview for MCP tool `get_agent_capabilities` and `/about`. */
+    describe_capabilities(): str_result {
+        return ok(`## Agent control (IDE automation via Inflection Point extension)
+
+The extension long-polls the server for commands. Requires:
+- Inflection Point VSIX installed, workspace open, \`inflection_point.agent_commands_enabled\` true (default)
+- Extension registered (heartbeat) — same \`session\` as in list_sessions
+
+### MCP tools (call these from the model)
+- **get_agent_capabilities** — this overview (no parameters)
+- **list_launch_configs** — names from .vscode/launch.json + allow/block state (synced from sidebar **Agent run (launch)**)
+- **start_debugging** — start a launch config by exact \`name\` (honors open/strict checkboxes)
+- **add_editor_breakpoint** / **remove_editor_breakpoint** — \`file_path\` (absolute), \`line\` (1-based)
+- **debug_continue** — resume after a stop
+
+### Typical flow
+1. list_sessions → pick \`session\` (name or id)
+2. list_launch_configs(session)
+3. start_debugging(session, launch_config_name)
+4. add_editor_breakpoint(...) then debug_continue as needed
+5. get_debug_state / explain_current_state when stopped
+
+### REST (extension ↔ server)
+- POST /api/sessions/:id/launch-sync — body { names: string[] }
+- POST /api/sessions/:id/launch-allow — body { mode: "open"|"strict", blocked: string[], allowed: string[] }
+- GET /api/sessions/:id/agent-commands/next?timeout_ms=55000 — long-poll
+- POST .../agent-commands/:command_id/complete | .../fail
+`);
+    }
+
     private resolve_session_id(session_query: string): string | undefined {
         return this.sessions.resolve_session_id(session_query);
     }

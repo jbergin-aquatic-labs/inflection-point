@@ -153,6 +153,13 @@ export function create_app(
             service: "inflection_point_mcp_server",
             mcp: "POST or GET / (streamable HTTP); also POST /mcp",
             health: "/api/health",
+            agent_control: {
+                description:
+                    "MCP tools: get_agent_capabilities, list_launch_configs, start_debugging, add_editor_breakpoint, remove_editor_breakpoint, debug_continue (plus existing debug read tools).",
+                extension_poll: "GET /api/sessions/:session_id/agent-commands/next?timeout_ms=55000",
+                launch_sync: "POST /api/sessions/:session_id/launch-sync { names: string[] }",
+                launch_policy: "POST /api/sessions/:session_id/launch-allow { mode, blocked, allowed }",
+            },
         });
     });
 
